@@ -141,7 +141,10 @@ func _on_card_pressed(card_data: Dictionary) -> void:
 	var position := Vector2(float(spawn_pos["x"]), float(spawn_pos["y"]))
 	position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
 
-	_spawn_manager.spawn_unit(card_data, position, _unit_container)
+	var target_pos: Dictionary = _stage_data["enemy_spawn_position"]
+	var target_position := Vector2(float(target_pos["x"]), float(target_pos["y"]))
+
+	_spawn_manager.spawn_unit(card_data, position, target_position, _unit_container)
 	print("BattleScene: spawned %s" % card_data.get("name", ""))
 
 

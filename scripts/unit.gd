@@ -6,6 +6,10 @@ const UNIT_HEIGHT: float = 80.0
 const IMAGE_HEIGHT: float = 64.0
 
 var _card_data: Dictionary
+var _speed: float = 0.0
+var _direction: Vector2 = Vector2.ZERO
+var _target_position: Vector2 = Vector2.ZERO
+var _has_reached_target: bool = false
 
 
 func _ready() -> void:
@@ -15,6 +19,39 @@ func _ready() -> void:
 func initialize(card_data: Dictionary) -> void:
 	_card_data = card_data
 	_apply_data()
+	_extract_movement_data()
+
+
+func configure_movement(target_position: Vector2) -> void:
+	_target_position = target_position
+	_calculate_direction()
+
+
+func _physics_process(delta: float) -> void:
+	if _has_reached_target:
+		return
+
+	_move(delta)
+	_check_arrival()
+	_debug_position()
+
+
+func _move(delta: float) -> void:
+	position += _direction * _speed * delta
+
+
+func _check_arrival() -> void:
+	var distance_to_target: float = position.distance_to(_target_position)
+	if distance_to_target < 2.0:
+		_has_reached_target = true
+		position = _target_position
+
+
+func _debug_position() -> void:
+	if Engine.is_editor_hint():
+		return
+	if int(position.x) % 100 == 0:
+		print("Unit %s position: %v" % [_card_data.get("name", ""), position])
 
 
 func _build_visual() -> void:
@@ -53,6 +90,20 @@ func _apply_data() -> void:
 		image.texture = load(image_path)
 	else:
 		image.texture = _create_placeholder(Vector2(UNIT_WIDTH, IMAGE_HEIGHT), Color(0.3, 0.3, 0.5))
+
+
+func _extract_movement_data() -> void:
+	var stats: Dictionary = _card_data.get("stats", {})
+	_speed = float(stats.get("speed", 0))
+
+
+func _calculate_direction() -> void:
+	var diff: Vector2 = _target_position - position
+	if diff.length() > 0.0:
+		_direction = diff.normalized()
+	else:
+		_direction = Vector2.RIGHT
+		_has_reached_target = true
 
 
 func _create_placeholder(size: Vector2, color: Color) -> ImageTexture:

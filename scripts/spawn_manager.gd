@@ -8,9 +8,10 @@ func _init(unit_scene: PackedScene) -> void:
 	_unit_scene = unit_scene
 
 
-func spawn_unit(card_data: Dictionary, spawn_position: Vector2, parent: Node) -> Unit:
+func spawn_unit(card_data: Dictionary, spawn_position: Vector2, target_position: Vector2, parent: Node) -> Unit:
 	var unit: Unit = _unit_scene.instantiate()
 	parent.add_child(unit)
 	unit.position = spawn_position
 	unit.initialize(card_data)
+	unit.configure_movement(target_position)
 	return unit
