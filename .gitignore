@@ -1,0 +1,82 @@
+# Godot 4 specific
+.godot/
+.import/
+
+# Godot 3 specific (legacy)
+.import/
+.export/
+
+# Compiled resources
+*.translation
+*.bin
+*.ctex
+
+# Exported builds
+*.pck
+*.zip
+*.apk
+*.aab
+*.exe
+*.dmg
+*.x86_64
+*.dll
+*.dylib
+*.so
+*.pdb
+*.ipa
+*.html5
+*.wasm
+*.web.zip
+
+# Build directories
+build/
+export/
+dist/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+*.autosave
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE and editor files
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Debug files
+*.debug
+*.profile
+*.trace
+
+# Mono/C# specific (if using C#)
+.mono/
+data_*/
+mono_crash.*.json
+
+# Asset cache
+.cache/
+
+# Temporary Godot files
+*.tmp
+*.temp
+uid://
