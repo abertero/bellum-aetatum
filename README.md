@@ -80,4 +80,7 @@ BattleScene
 
 ## Milestones
 
-- [x] Milestone 1 — Architecture validation (see `MILESTONE_1.md`)
+See `MILESTONES.md` for detailed documentation of each milestone.
+
+- [x] Milestone 1 — Architecture validation
+- [x] Milestone 2 — Unit movement
