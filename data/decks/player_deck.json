@@ -1,0 +1,16 @@
+{
+    "_comment": "Player starter deck. card_ids references card id values from cards.json. Order defines hand layout.",
+    "deck_name": "Player Starter Deck",
+    "card_ids": [
+        "knight_001",
+        "archer_001",
+        "tank_001",
+        "assassin_001",
+        "cleric_001",
+        "mage_001",
+        "spearman_001",
+        "cavalry_001",
+        "giant_001",
+        "goblin_001"
+    ]
+}

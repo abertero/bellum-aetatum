@@ -1,0 +1,15 @@
+{
+    "_comment": "Stage configuration. battlefield_width: total pixel width. player/enemy_spawn_position: where units appear. background: texture path (empty for solid color).",
+    "stage_id": "stage_001",
+    "stage_name": "Verdant Fields",
+    "battlefield_width": 1152,
+    "player_spawn_position": {
+        "x": 180,
+        "y": 280
+    },
+    "enemy_spawn_position": {
+        "x": 972,
+        "y": 280
+    },
+    "background": ""
+}

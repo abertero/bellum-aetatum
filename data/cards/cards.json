@@ -1,0 +1,125 @@
+{
+    "_comment": "Card database. Each card has: id (unique identifier), name (display name), image (texture path), stats (gameplay values).",
+    "cards": [
+        {
+            "id": "knight_001",
+            "name": "Knight",
+            "image": "res://assets/cards/knight.png",
+            "stats": {
+                "hp": 100,
+                "attack": 25,
+                "range": 1,
+                "speed": 50,
+                "cost": 3
+            }
+        },
+        {
+            "id": "archer_001",
+            "name": "Archer",
+            "image": "res://assets/cards/archer.png",
+            "stats": {
+                "hp": 60,
+                "attack": 20,
+                "range": 4,
+                "speed": 40,
+                "cost": 2
+            }
+        },
+        {
+            "id": "tank_001",
+            "name": "Shield Bearer",
+            "image": "res://assets/cards/tank.png",
+            "stats": {
+                "hp": 200,
+                "attack": 10,
+                "range": 1,
+                "speed": 30,
+                "cost": 4
+            }
+        },
+        {
+            "id": "assassin_001",
+            "name": "Shadow Blade",
+            "image": "res://assets/cards/assassin.png",
+            "stats": {
+                "hp": 50,
+                "attack": 40,
+                "range": 1,
+                "speed": 80,
+                "cost": 4
+            }
+        },
+        {
+            "id": "cleric_001",
+            "name": "Cleric",
+            "image": "res://assets/cards/cleric.png",
+            "stats": {
+                "hp": 70,
+                "attack": 15,
+                "range": 3,
+                "speed": 45,
+                "cost": 3
+            }
+        },
+        {
+            "id": "mage_001",
+            "name": "Fire Mage",
+            "image": "res://assets/cards/mage.png",
+            "stats": {
+                "hp": 55,
+                "attack": 35,
+                "range": 5,
+                "speed": 35,
+                "cost": 5
+            }
+        },
+        {
+            "id": "spearman_001",
+            "name": "Spearman",
+            "image": "res://assets/cards/spearman.png",
+            "stats": {
+                "hp": 80,
+                "attack": 22,
+                "range": 2,
+                "speed": 55,
+                "cost": 2
+            }
+        },
+        {
+            "id": "cavalry_001",
+            "name": "War Rider",
+            "image": "res://assets/cards/cavalry.png",
+            "stats": {
+                "hp": 90,
+                "attack": 30,
+                "range": 1,
+                "speed": 90,
+                "cost": 4
+            }
+        },
+        {
+            "id": "giant_001",
+            "name": "Stone Giant",
+            "image": "res://assets/cards/giant.png",
+            "stats": {
+                "hp": 300,
+                "attack": 15,
+                "range": 1,
+                "speed": 20,
+                "cost": 6
+            }
+        },
+        {
+            "id": "goblin_001",
+            "name": "Goblin Scout",
+            "image": "res://assets/cards/goblin.png",
+            "stats": {
+                "hp": 40,
+                "attack": 12,
+                "range": 1,
+                "speed": 70,
+                "cost": 1
+            }
+        }
+    ]
+}

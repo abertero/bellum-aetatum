@@ -1,0 +1,14 @@
+{
+    "_comment": "Enemy deck for stage 001. card_ids references card id values from cards.json.",
+    "deck_name": "Enemy Deck Stage 001",
+    "card_ids": [
+        "knight_001",
+        "archer_001",
+        "tank_001",
+        "assassin_001",
+        "mage_001",
+        "spearman_001",
+        "cavalry_001",
+        "giant_001"
+    ]
+}
