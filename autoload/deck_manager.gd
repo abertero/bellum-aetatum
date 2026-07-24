@@ -3,6 +3,7 @@ extends Node
 var _cards: Dictionary = {}
 var _player_deck: Array[Dictionary] = []
 var _enemy_deck: Array[Dictionary] = []
+var _stats_factory: UnitStatsFactory = UnitStatsFactory.new()
 
 
 func _ready() -> void:
@@ -16,7 +17,9 @@ func _load_card_database() -> void:
 		return
 
 	for card: Dictionary in data["cards"]:
-		_cards[card["id"]] = card
+		var card_with_stats: Dictionary = card.duplicate()
+		card_with_stats["stats"] = _stats_factory.create_from_dictionary(card.get("stats", {}))
+		_cards[card["id"]] = card_with_stats
 
 
 func load_player_deck(deck_path: String) -> Array[Dictionary]:

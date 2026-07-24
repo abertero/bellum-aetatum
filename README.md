@@ -84,3 +84,4 @@ See `MILESTONES.md` for detailed documentation of each milestone.
 
 - [x] Milestone 1 — Architecture validation
 - [x] Milestone 2 — Unit movement
+- [x] Milestone 3 — UnitStats refactoring

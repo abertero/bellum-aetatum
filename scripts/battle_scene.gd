@@ -119,9 +119,9 @@ func _create_card_button(card_data: Dictionary) -> PanelContainer:
 	name_label.add_theme_font_size_override("font_size", 10)
 	vbox.add_child(name_label)
 
-	var stats: Dictionary = card_data.get("stats", {})
+	var card_stats: UnitStats = card_data.get("stats", UnitStats.new())
 	var cost_label := Label.new()
-	cost_label.text = "Cost: %d" % stats.get("cost", 0)
+	cost_label.text = "Cost: %d" % card_stats.cost
 	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cost_label.add_theme_font_size_override("font_size", 10)
 	vbox.add_child(cost_label)

@@ -251,3 +251,122 @@ BattleScene._on_card_pressed()
 - `Unit._check_arrival()` can trigger combat or other behaviors.
 - `SpawnManager` can be extended to support enemy unit spawning.
 - Movement patterns can be extended (zigzag, formation, etc.) without modifying existing code.
+
+---
+
+## Milestone 3 — UnitStats Refactoring
+
+### Objective
+
+Improve the internal architecture by introducing a dedicated `UnitStats` class to encapsulate gameplay statistics. This refactoring separates data representation from raw JSON dictionaries, making the codebase more maintainable and type-safe.
+
+### What Was Implemented
+
+#### 1. UnitStats Class
+
+- New `UnitStats` class (`scripts/unit_stats.gd`) that stores all gameplay statistics: `hp`, `attack`, `range`, `speed`, `cost`.
+- Extends `RefCounted` as a pure data container.
+- Constructor accepts all stat values with defaults.
+
+#### 2. UnitStatsFactory
+
+- New `UnitStatsFactory` class (`scripts/unit_stats_factory.gd`) responsible for converting JSON dictionaries into `UnitStats` instances.
+- Single method: `create_from_dictionary(data: Dictionary) -> UnitStats`.
+- Centralizes all stats deserialization logic in one place.
+
+#### 3. DeckManager Integration
+
+- `DeckManager` now uses `UnitStatsFactory` to convert the `stats` sub-dictionary into a `UnitStats` instance when loading the card database.
+- The card dictionary now contains `stats` as a `UnitStats` object instead of a raw `Dictionary`.
+
+#### 4. Unit Refactoring
+
+- `Unit` now has a public property `stats: UnitStats` instead of reading from `_card_data["stats"]`.
+- Movement reads `stats.speed` directly instead of extracting from dictionary.
+- Removed `_extract_movement_data()` method (no longer needed).
+- Removed `_speed` private variable (now accessed via `stats.speed`).
+
+#### 5. BattleScene Update
+
+- `BattleScene` now accesses `card_stats.cost` as a property instead of `stats.get("cost", 0)`.
+- Type-safe access to stats throughout the UI code.
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `scripts/unit_stats.gd` | Data class for unit statistics |
+| `scripts/unit_stats_factory.gd` | Factory for deserializing JSON into UnitStats |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `autoload/deck_manager.gd` | +3 lines | Added `_stats_factory` instance, converts stats Dictionary to UnitStats during card loading |
+| `scripts/unit.gd` | -5 lines | Removed `_speed` variable and `_extract_movement_data()`, added `stats: UnitStats` property |
+| `scripts/battle_scene.gd` | ~2 lines | Changed from `stats.get("cost", 0)` to `card_stats.cost` |
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **UnitStats**: Responsible only for storing gameplay statistics. No behavior, no parsing.
+- **UnitStatsFactory**: Responsible only for deserializing JSON into UnitStats. No game logic.
+- **Unit**: Owns a UnitStats instance, reads stats as properties instead of parsing dictionaries.
+- **DeckManager**: Orchestrates the conversion during loading, keeping parsing logic centralized.
+
+#### Open/Closed Principle
+
+- Adding new stats (e.g., `crit_chance`, `armor`) only requires:
+  1. Adding the field to `UnitStats`
+  2. Adding the field to `UnitStatsFactory.create_from_dictionary()`
+- No changes needed in Unit, BattleScene, or any consumer code.
+
+#### Dependency Inversion
+
+- `Unit` depends on `UnitStats` (abstraction) instead of raw `Dictionary` (concrete implementation).
+- `DeckManager` depends on `UnitStatsFactory` (abstraction) instead of inline parsing logic.
+- Consumers access stats as typed properties, not dictionary keys.
+
+#### No Duplicated Parsing Logic
+
+- Before: Multiple places could parse `stats` dictionary independently.
+- After: Only `UnitStatsFactory` knows how to convert JSON to UnitStats.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | UnitStats stores data, Factory deserializes, Unit uses stats |
+| Open/Closed | New stats added in one place (UnitStats + Factory) |
+| Liskov Substitution | UnitStats can be extended or replaced without breaking Unit |
+| Interface Segregation | UnitStats exposes only stat properties, no unnecessary methods |
+| Dependency Inversion | Unit depends on UnitStats abstraction, not Dictionary implementation |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | `unit_stats.gd` is 19 lines, `unit_stats_factory.gd` is 13 lines |
+| Functions under 30 lines | All functions are 1-10 lines |
+| No static methods | Factory uses instance methods |
+| Single responsibility per class | Each class has one clear purpose |
+| Reusable scripts | UnitStats can be used anywhere stats are needed |
+| No hardcoded game values | Stats still come from JSON |
+| Factories over switches | UnitStatsFactory converts JSON to typed objects |
+| Dependencies point inward | Unit -> UnitStats, DeckManager -> UnitStatsFactory |
+
+### Behavior Preserved
+
+- Units still move at the same speed.
+- UI still displays the same cost values.
+- Spawning still works identically.
+- No visual or gameplay changes.
+
+### Extension Points for Future Milestones
+
+- `UnitStats` can be extended with new stats (crit, armor, abilities) without changing consumers.
+- `UnitStats` can be made serializable for save/load systems.
+- `UnitStats` can support stat modifiers (buffs/debuffs) in future combat milestones.
+- `UnitStatsFactory` can be extended to load from different data sources (Resources, databases).
+

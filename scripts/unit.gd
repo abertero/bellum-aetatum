@@ -6,7 +6,7 @@ const UNIT_HEIGHT: float = 80.0
 const IMAGE_HEIGHT: float = 64.0
 
 var _card_data: Dictionary
-var _speed: float = 0.0
+var stats: UnitStats
 var _direction: Vector2 = Vector2.ZERO
 var _target_position: Vector2 = Vector2.ZERO
 var _has_reached_target: bool = false
@@ -18,8 +18,8 @@ func _ready() -> void:
 
 func initialize(card_data: Dictionary) -> void:
 	_card_data = card_data
+	stats = card_data.get("stats", UnitStats.new())
 	_apply_data()
-	_extract_movement_data()
 
 
 func configure_movement(target_position: Vector2) -> void:
@@ -37,7 +37,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _move(delta: float) -> void:
-	position += _direction * _speed * delta
+	position += _direction * stats.speed * delta
 
 
 func _check_arrival() -> void:
@@ -90,11 +90,6 @@ func _apply_data() -> void:
 		image.texture = load(image_path)
 	else:
 		image.texture = _create_placeholder(Vector2(UNIT_WIDTH, IMAGE_HEIGHT), Color(0.3, 0.3, 0.5))
-
-
-func _extract_movement_data() -> void:
-	var stats: Dictionary = _card_data.get("stats", {})
-	_speed = float(stats.get("speed", 0))
 
 
 func _calculate_direction() -> void:
