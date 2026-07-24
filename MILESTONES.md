@@ -370,3 +370,170 @@ Improve the internal architecture by introducing a dedicated `UnitStats` class t
 - `UnitStats` can support stat modifiers (buffs/debuffs) in future combat milestones.
 - `UnitStatsFactory` can be extended to load from different data sources (Resources, databases).
 
+---
+
+## Milestone 4 — Formation and Collision System
+
+### Objective
+
+Implement unit collision detection, formation mechanics, and a battle group system. Units now stop when they collide with enemies and form battle lines with configurable spacing.
+
+### What Was Implemented
+
+#### 1. Unit State Machine
+
+- New `UnitState` class with enum: `MOVING`, `WAITING`, `BLOCKED`, `DEAD`.
+- Units transition between states based on formation status.
+- Visual debug label displays current state above each unit.
+
+#### 2. Team System
+
+- Units now have a `team` property ("player" or "enemy").
+- SpawnManager accepts team parameter when creating units.
+- FormationManager uses team to detect opposing units.
+
+#### 3. BattleGroup Class
+
+- Lightweight data structure that organizes units in combat.
+- Tracks `frontline_position`, `allied_units`, and `enemy_units`.
+- Does NOT calculate damage or resolve combat.
+
+#### 4. FormationManager
+
+- Dedicated system for collision detection and formation management.
+- Detects when opposing units collide (within 40 pixels).
+- Creates BattleGroups at collision points.
+- Assigns units to groups and calculates formation positions.
+- Configurable `formation_spacing` from stage JSON.
+
+#### 5. Automatic Enemy Spawning
+
+- BattleScene spawns enemy units every 3 seconds.
+- Uses enemy deck from JSON.
+- Cycles through enemy deck cards.
+
+#### 6. Formation Behavior
+
+- When two opposing units collide, they form a BattleGroup.
+- Units change to `BLOCKED` state and stop moving.
+- New allied units joining the formation are positioned behind the frontline.
+- Units move to their formation position with `formation_spacing` offset.
+- Units change to `WAITING` state while moving to formation, then `BLOCKED` when in position.
+
+#### 7. Visual Debug
+
+- Each unit displays its current state (Moving, Waiting, Blocked, Dead) above the sprite.
+- State label is yellow for visibility.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `scripts/unit_state.gd` | 18 | Enum and state string conversion |
+| `scripts/battle_group.gd` | 30 | Data structure for organizing units in combat |
+| `scripts/formation_manager.gd` | 108 | Collision detection and formation management |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `data/stages/stage_001.json` | +1 field | Added `formation_spacing: 32` |
+| `scripts/unit.gd` | +80 lines | Added state machine, team system, formation target, state label |
+| `scripts/spawn_manager.gd` | +1 parameter | Added `team` parameter to spawn_unit |
+| `scripts/battle_scene.gd` | +40 lines | Added FormationManager, enemy spawn timer, unit registration |
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **UnitState**: Only defines states and converts to strings.
+- **BattleGroup**: Only organizes units, no combat logic.
+- **FormationManager**: Only handles collision detection and formation positioning.
+- **Unit**: Owns state transitions and movement, delegates collision to FormationManager.
+- **BattleScene**: Coordinates systems, doesn't calculate collisions.
+
+#### Open/Closed Principle
+
+- New unit states can be added to UnitState enum without modifying Unit.
+- New formation patterns can be added to FormationManager without changing Unit.
+- Formation spacing is configurable via JSON, not hardcoded.
+
+#### Dependency Inversion
+
+- Unit depends on UnitState abstraction, not concrete state logic.
+- FormationManager depends on Unit interface (get_team, get_current_state), not implementation.
+- BattleScene depends on FormationManager abstraction, not collision details.
+
+### Formation Flow
+
+```
+BattleScene._physics_process()
+  -> _update_enemy_spawn_timer()
+       -> every 3 seconds: _spawn_enemy_unit()
+            -> SpawnManager.spawn_unit(card, pos, target, parent, "enemy")
+            -> FormationManager.register_unit(unit)
+
+FormationManager._physics_process()
+  -> _detect_collisions()
+       -> for each pair of opposing units:
+            -> if distance < 40px: _create_or_join_battle_group()
+                 -> create BattleGroup at midpoint
+                 -> add units to group
+                 -> unit.set_battle_group(group) -> state = BLOCKED
+                 -> _position_unit_in_formation() -> set formation target
+  -> _update_formations()
+       -> for each unit in groups:
+            -> if MOVING: _position_unit_in_formation()
+
+Unit._physics_process()
+  -> match _current_state:
+       -> MOVING: _move_toward(formation_target or target_position)
+       -> WAITING: _move_toward(formation_target), then BLOCKED when arrived
+       -> BLOCKED: do nothing
+       -> DEAD: do nothing
+```
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each class has one clear purpose (state, group, formation, unit, scene) |
+| Open/Closed | New states, formations, and teams can be added without modifying existing code |
+| Liskov Substitution | Units can be replaced with different implementations without breaking FormationManager |
+| Interface Segregation | Units expose only necessary methods (get_team, get_current_state, set_battle_group) |
+| Dependency Inversion | BattleScene depends on FormationManager abstraction, not collision details |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All new classes are under 110 lines |
+| Functions under 30 lines | All functions are 1-15 lines |
+| No static methods | Only UnitState.to_string() is static (pure utility) |
+| Single responsibility per scene | Unit owns state, FormationManager owns collision, BattleScene owns coordination |
+| Reusable scripts | BattleGroup and FormationManager work with any unit configuration |
+| No hardcoded game values | Formation spacing comes from JSON |
+| Factories over switches | FormationManager creates BattleGroups dynamically |
+| Dependencies point inward | BattleScene -> FormationManager -> BattleGroup, Unit -> UnitState |
+
+### What Was NOT Implemented (Intentionally)
+
+- Combat / damage
+- Attack mechanics
+- Health reduction
+- Target selection
+- Abilities / effects
+- Animations
+- AOE / projectiles
+- Spells
+- Economy / deck editing
+
+### Extension Points for Future Milestones
+
+- `UnitState.DEAD` is reserved for future death mechanics.
+- `BattleGroup` can be extended to calculate combat between allied and enemy units.
+- `FormationManager` can support different formation types (line, column, wedge).
+- `Unit` can support attack animations and combat states.
+- `formation_spacing` can be made dynamic based on unit types.
+
+

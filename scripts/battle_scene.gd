@@ -5,18 +5,34 @@ const BASE_HEIGHT: float = 120.0
 const CARD_BUTTON_WIDTH: float = 90.0
 const CARD_BUTTON_HEIGHT: float = 130.0
 const VIEWPORT_HEIGHT: float = 648.0
+const ENEMY_SPAWN_INTERVAL: float = 3.0
 
 var _stage_data: Dictionary
 var _spawn_manager: SpawnManager
+var _formation_manager: FormationManager
 var _unit_container: Node2D
+var _enemy_spawn_timer: float = 0.0
+var _enemy_deck_index: int = 0
 
 
 func _ready() -> void:
 	_load_stage()
 	_setup_battlefield()
 	_setup_spawn_manager()
+	_setup_formation_manager()
 	_load_decks()
 	_create_card_buttons()
+
+
+func _physics_process(delta: float) -> void:
+	_update_enemy_spawn_timer(delta)
+
+
+func _update_enemy_spawn_timer(delta: float) -> void:
+	_enemy_spawn_timer += delta
+	if _enemy_spawn_timer >= ENEMY_SPAWN_INTERVAL:
+		_enemy_spawn_timer = 0.0
+		_spawn_enemy_unit()
 
 
 func _load_stage() -> void:
@@ -29,6 +45,7 @@ func _load_stage() -> void:
 			"battlefield_width": 1152,
 			"player_spawn_position": {"x": 180, "y": 280},
 			"enemy_spawn_position": {"x": 972, "y": 280},
+			"formation_spacing": 32.0,
 			"background": ""
 		}
 
@@ -62,6 +79,13 @@ func _setup_battlefield() -> void:
 func _setup_spawn_manager() -> void:
 	var unit_scene: PackedScene = load("res://scenes/unit.tscn")
 	_spawn_manager = SpawnManager.new(unit_scene)
+
+
+func _setup_formation_manager() -> void:
+	_formation_manager = FormationManager.new()
+	var formation_spacing: float = float(_stage_data.get("formation_spacing", 32.0))
+	_formation_manager.initialize(formation_spacing)
+	add_child(_formation_manager)
 
 
 func _load_decks() -> void:
@@ -144,8 +168,29 @@ func _on_card_pressed(card_data: Dictionary) -> void:
 	var target_pos: Dictionary = _stage_data["enemy_spawn_position"]
 	var target_position := Vector2(float(target_pos["x"]), float(target_pos["y"]))
 
-	_spawn_manager.spawn_unit(card_data, position, target_position, _unit_container)
+	var unit: Unit = _spawn_manager.spawn_unit(card_data, position, target_position, _unit_container, "player")
+	_formation_manager.register_unit(unit)
 	print("BattleScene: spawned %s" % card_data.get("name", ""))
+
+
+func _spawn_enemy_unit() -> void:
+	var enemy_deck: Array[Dictionary] = DeckManager.get_enemy_deck()
+	if enemy_deck.is_empty():
+		return
+
+	var card_data: Dictionary = enemy_deck[_enemy_deck_index % enemy_deck.size()]
+	_enemy_deck_index += 1
+
+	var spawn_pos: Dictionary = _stage_data["enemy_spawn_position"]
+	var position := Vector2(float(spawn_pos["x"]), float(spawn_pos["y"]))
+	position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
+
+	var target_pos: Dictionary = _stage_data["player_spawn_position"]
+	var target_position := Vector2(float(target_pos["x"]), float(target_pos["y"]))
+
+	var unit: Unit = _spawn_manager.spawn_unit(card_data, position, target_position, _unit_container, "enemy")
+	_formation_manager.register_unit(unit)
+	print("BattleScene: spawned enemy %s" % card_data.get("name", ""))
 
 
 func _create_placeholder(size: Vector2, color: Color) -> ImageTexture:

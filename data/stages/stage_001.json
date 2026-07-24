@@ -1,5 +1,5 @@
 {
-    "_comment": "Stage configuration. battlefield_width: total pixel width. player/enemy_spawn_position: where units appear. background: texture path (empty for solid color).",
+    "_comment": "Stage configuration. battlefield_width: total pixel width. player/enemy_spawn_position: where units appear. formation_spacing: pixels between units in formation. background: texture path (empty for solid color).",
     "stage_id": "stage_001",
     "stage_name": "Verdant Fields",
     "battlefield_width": 1152,
@@ -11,5 +11,6 @@
         "x": 972,
         "y": 280
     },
+    "formation_spacing": 32,
     "background": ""
 }
