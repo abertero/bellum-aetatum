@@ -6,16 +6,19 @@ const UNIT_HEIGHT: float = 80.0
 const IMAGE_HEIGHT: float = 64.0
 const HP_BAR_HEIGHT: float = 6.0
 
-var _card_data: Dictionary
+var definition: Dictionary
 var stats: UnitStats
 var current_hp: int = 0
-var _team: String = "player"
+var unit_owner: String = "player"
+var battle_group: BattleGroup = null
+var current_state: int = UnitState.State.MOVING
+var attack_cooldown: float = 0.0
+var current_target: Unit = null
+var active_effects: Array = []
+
 var _direction: Vector2 = Vector2.ZERO
 var _target_position: Vector2 = Vector2.ZERO
 var _has_reached_target: bool = false
-
-var _current_state: int = UnitState.State.MOVING
-var _battle_group: BattleGroup = null
 var _formation_target: Vector2 = Vector2.ZERO
 var _has_formation_target: bool = false
 
@@ -27,10 +30,10 @@ func _ready() -> void:
 	_build_visual()
 
 
-func initialize(card_data: Dictionary, team: String = "player") -> void:
-	_card_data = card_data
-	_team = team
-	stats = card_data.get("stats", UnitStats.new())
+func initialize(card_data: Dictionary, p_owner: String = "player") -> void:
+	definition = card_data
+	unit_owner = p_owner
+	stats = definition.get("stats", UnitStats.new())
 	current_hp = stats.hp
 	_apply_data()
 	_update_state_label()
@@ -42,37 +45,25 @@ func configure_movement(target_position: Vector2) -> void:
 	_calculate_direction()
 
 
-func get_current_state() -> int:
-	return _current_state
-
-
-func get_team() -> String:
-	return _team
-
-
-func get_battle_group() -> BattleGroup:
-	return _battle_group
-
-
 func set_battle_group(group: BattleGroup) -> void:
-	_battle_group = group
+	battle_group = group
 	_set_state(UnitState.State.BLOCKED)
 
 
 func set_formation_target(target: Vector2) -> void:
 	_formation_target = target
 	_has_formation_target = true
-	if _current_state == UnitState.State.BLOCKED:
+	if current_state == UnitState.State.BLOCKED:
 		_set_state(UnitState.State.WAITING)
 
 
 func set_attacking() -> void:
-	if _current_state != UnitState.State.ATTACKING:
+	if current_state != UnitState.State.ATTACKING:
 		_set_state(UnitState.State.ATTACKING)
 
 
 func set_blocked() -> void:
-	if _current_state == UnitState.State.ATTACKING:
+	if current_state == UnitState.State.ATTACKING:
 		_set_state(UnitState.State.BLOCKED)
 
 
@@ -87,12 +78,14 @@ func is_melee() -> bool:
 func take_damage(amount: int) -> void:
 	current_hp = max(0, current_hp - amount)
 	_update_hp_display()
+	EventBus.unit_damaged.emit(self, amount)
 	if not is_alive():
 		_set_state(UnitState.State.DEAD)
+		EventBus.unit_died.emit(self)
 
 
 func _physics_process(delta: float) -> void:
-	match _current_state:
+	match current_state:
 		UnitState.State.MOVING:
 			_process_moving(delta)
 		UnitState.State.WAITING:
@@ -156,19 +149,19 @@ func _debug_position() -> void:
 	if Engine.is_editor_hint():
 		return
 	if int(position.x) % 100 == 0:
-		print("Unit %s position: %v" % [_card_data.get("name", ""), position])
+		print("Unit %s position: %v" % [definition.get("name", ""), position])
 
 
 func _set_state(new_state: int) -> void:
-	if _current_state != new_state:
-		_current_state = new_state
+	if current_state != new_state:
+		current_state = new_state
 		_update_state_label()
 
 
 func _update_state_label() -> void:
 	var state_label: Label = get_node_or_null("StateLabel")
 	if state_label:
-		state_label.text = UnitState.to_str(_current_state)
+		state_label.text = UnitState.to_str(current_state)
 
 
 func _update_hp_display() -> void:
@@ -255,14 +248,14 @@ func _build_visual() -> void:
 
 
 func _apply_data() -> void:
-	if _card_data.is_empty():
+	if definition.is_empty():
 		return
 
 	var label: Label = get_node("UnitName")
-	label.text = _card_data.get("name", "")
+	label.text = definition.get("name", "")
 
 	var image: TextureRect = get_node("UnitImage")
-	var image_path: String = _card_data.get("image", "")
+	var image_path: String = definition.get("image", "")
 	if image_path != "" and ResourceLoader.exists(image_path):
 		image.texture = load(image_path)
 	else:

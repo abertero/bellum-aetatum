@@ -24,6 +24,7 @@ func _ready() -> void:
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
+	EventBus.battle_started.emit()
 
 
 func _physics_process(delta: float) -> void:
@@ -177,7 +178,6 @@ func _on_card_pressed(card_data: Dictionary) -> void:
 	var target_position := Vector2(float(target_pos["x"]), float(target_pos["y"]))
 
 	var unit: Unit = _spawn_manager.spawn_unit(card_data, position, target_position, _unit_container, "player")
-	_formation_manager.register_unit(unit)
 	print("BattleScene: spawned %s" % card_data.get("name", ""))
 
 
@@ -197,7 +197,6 @@ func _spawn_enemy_unit() -> void:
 	var target_position := Vector2(float(target_pos["x"]), float(target_pos["y"]))
 
 	var unit: Unit = _spawn_manager.spawn_unit(card_data, position, target_position, _unit_container, "enemy")
-	_formation_manager.register_unit(unit)
 	print("BattleScene: spawned enemy %s" % card_data.get("name", ""))
 
 

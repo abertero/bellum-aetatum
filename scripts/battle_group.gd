@@ -2,6 +2,8 @@ class_name BattleGroup
 extends RefCounted
 
 var frontline_position: Vector2 = Vector2.ZERO
+var allied_team: String = ""
+var enemy_team: String = ""
 var allied_units: Array[Unit] = []
 var enemy_units: Array[Unit] = []
 

@@ -8,6 +8,7 @@ var _attack_timers: Dictionary
 func initialize(formation_manager: FormationManager) -> void:
 	_formation_manager = formation_manager
 	_attack_timers = {}
+	EventBus.unit_died.connect(_on_unit_died)
 
 
 func _physics_process(delta: float) -> void:
@@ -80,15 +81,11 @@ func _apply_damage(attacker: Unit, target: Unit) -> void:
 		return
 	var damage: int = attacker.stats.attack
 	target.take_damage(damage)
-	if not target.is_alive():
-		_handle_death(target)
 
 
-func _handle_death(unit: Unit) -> void:
+func _on_unit_died(unit: Unit) -> void:
 	_attack_timers.erase(unit)
-
-	var group: BattleGroup = unit.get_battle_group()
+	var group: BattleGroup = unit.battle_group
 	if group != null:
 		group.remove_unit(unit)
-
 	unit.queue_free()

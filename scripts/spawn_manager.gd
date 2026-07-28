@@ -14,4 +14,5 @@ func spawn_unit(card_data: Dictionary, spawn_position: Vector2, target_position:
 	unit.position = spawn_position
 	unit.initialize(card_data, team)
 	unit.configure_movement(target_position)
+	EventBus.unit_spawned.emit(unit)
 	return unit
