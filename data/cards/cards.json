@@ -130,6 +130,162 @@
                 "cost": 1,
                 "attack_speed": 1.8
             }
+        },
+        {
+            "id": "necromancer_001",
+            "name": "Necromancer",
+            "image": "res://assets/cards/necromancer.png",
+            "stats": {
+                "hp": 65,
+                "attack": 28,
+                "range": 4,
+                "speed": 35,
+                "cost": 5,
+                "attack_speed": 0.9
+            }
+        },
+        {
+            "id": "dragon_001",
+            "name": "Ancient Dragon",
+            "image": "res://assets/cards/dragon.png",
+            "stats": {
+                "hp": 250,
+                "attack": 45,
+                "range": 3,
+                "speed": 60,
+                "cost": 8,
+                "attack_speed": 1.2
+            }
+        },
+        {
+            "id": "witch_001",
+            "name": "Swamp Witch",
+            "image": "res://assets/cards/witch.png",
+            "stats": {
+                "hp": 55,
+                "attack": 22,
+                "range": 4,
+                "speed": 40,
+                "cost": 4,
+                "attack_speed": 1.0
+            }
+        },
+        {
+            "id": "berserker_001",
+            "name": "Berserker",
+            "image": "res://assets/cards/berserker.png",
+            "stats": {
+                "hp": 85,
+                "attack": 38,
+                "range": 1,
+                "speed": 65,
+                "cost": 5,
+                "attack_speed": 1.6
+            }
+        },
+        {
+            "id": "paladin_001",
+            "name": "Holy Paladin",
+            "image": "res://assets/cards/paladin.png",
+            "stats": {
+                "hp": 180,
+                "attack": 20,
+                "range": 1,
+                "speed": 40,
+                "cost": 6,
+                "attack_speed": 0.8
+            }
+        },
+        {
+            "id": "crossbowman_001",
+            "name": "Crossbowman",
+            "image": "res://assets/cards/crossbowman.png",
+            "stats": {
+                "hp": 70,
+                "attack": 30,
+                "range": 5,
+                "speed": 30,
+                "cost": 3,
+                "attack_speed": 0.6
+            }
+        },
+        {
+            "id": "monk_001",
+            "name": "War Monk",
+            "image": "res://assets/cards/monk.png",
+            "stats": {
+                "hp": 75,
+                "attack": 25,
+                "range": 1,
+                "speed": 70,
+                "cost": 3,
+                "attack_speed": 1.4
+            }
+        },
+        {
+            "id": "warlock_001",
+            "name": "Dark Warlock",
+            "image": "res://assets/cards/warlock.png",
+            "stats": {
+                "hp": 60,
+                "attack": 32,
+                "range": 4,
+                "speed": 38,
+                "cost": 5,
+                "attack_speed": 0.85
+            }
+        },
+        {
+            "id": "pegasus_001",
+            "name": "Pegasus Rider",
+            "image": "res://assets/cards/pegasus.png",
+            "stats": {
+                "hp": 70,
+                "attack": 28,
+                "range": 1,
+                "speed": 95,
+                "cost": 5,
+                "attack_speed": 1.7
+            }
+        },
+        {
+            "id": "golem_001",
+            "name": "Crystal Golem",
+            "image": "res://assets/cards/golem.png",
+            "stats": {
+                "hp": 280,
+                "attack": 18,
+                "range": 1,
+                "speed": 25,
+                "cost": 7,
+                "attack_speed": 0.5
+            }
+        },
+        {
+            "id": "pirate_001",
+            "name": "Sea Pirate",
+            "image": "res://assets/cards/pirate.png",
+            "stats": {
+                "hp": 80,
+                "attack": 26,
+                "range": 2,
+                "speed": 55,
+                "cost": 3,
+                "attack_speed": 1.3
+            }
+        },
+        {
+            "id": "shaman_001",
+            "name": "Tribal Shaman",
+            "image": "res://assets/cards/shaman.png",
+            "stats": {
+                "hp": 68,
+                "attack": 18,
+                "range": 3,
+                "speed": 45,
+                "cost": 3,
+                "attack_speed": 1.1
+            }
         }
     ]
 }

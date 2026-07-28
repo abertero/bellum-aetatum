@@ -9,6 +9,12 @@
         "mage_001",
         "spearman_001",
         "cavalry_001",
-        "giant_001"
+        "giant_001",
+        "necromancer_001",
+        "witch_001",
+        "berserker_001",
+        "warlock_001",
+        "golem_001",
+        "shaman_001"
     ]
 }
