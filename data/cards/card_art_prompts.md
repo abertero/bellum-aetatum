@@ -3,21 +3,29 @@
 ## Recommended AI Tool
 
 ### Primary: Leonardo.ai
-- **Model**: Leonardo Diffusion XL o Leonardo Anime XL
-- **Feature clave**: "Style Reference" - sube una imagen base y referencia con `--sref` o usa Image Guidance
-- **Ventaja**: Especializado en game assets, permite entrenar LoRAs personalizados
+- **Model**: Leonardo Diffusion XL o Leonardo Vision XL
+- **Feature clave**: "Style Reference" - sube una imagen base y referencia con Image Guidance
+- **Ventaja**: Excelente para estilos clásicos e históricos, permite entrenar LoRAs personalizados
 - **Costo**: 150 tokens/dia gratis (suficiente para ~30 imagenes/dia)
 - **Configuracion recomendada**:
-  - Resolution: 768x768 o 512x768 (portrait)
+  - Resolution: 768x1024 (portrait 3:4) o 832x1216 (portrait 2:3)
   - Guidance Scale: 7-9
   - Steps: 30-40
   - Tiling: OFF
+  - Model: Leonardo Diffusion XL para mejor detalle histórico
 
 ### Alternative: Midjourney
-- **Modo**: `--niji 5` (anime/illustration style)
+- **Modo**: `--v 6.0` (NO usar --niji, es muy anime moderno)
 - **Style Reference**: `--sref [URL]` para consistencia
-- **Ventaja**: Mejor calidad artistica, mas control de estilo
+- **Ventaja**: Mejor para estilos clásicos y realistas, excelente detalle histórico
 - **Costo**: $10/mes basico
+- **Parametros adicionales**: `--ar 3:4` para formato vertical, `--style raw` para menos estetización
+
+### Alternative: Stable Diffusion + LoRA
+- **Model**: Stable Diffusion XL + LoRA de estilo clásico
+- **Ventaja**: Control total, puedes entrenar LoRAs específicos para cada época
+- **Costo**: Gratis si corres localmente, o ~$5-10/mes en servicios cloud
+- **Mejor para**: Máxima consistencia y control de estilo histórico
 
 ---
 
@@ -26,137 +34,131 @@
 Este es el anchor de estilo que DEBE aparecer en cada prompt para mantener consistencia:
 
 ```
-2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions (large head, small body), no background details, game asset style, high contrast, flat colors with subtle gradients
+classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes and armor, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail, no anachronistic elements
 ```
 
 ### Negative Prompt (usar siempre):
 ```
-realistic, photorealistic, 3D render, blurry, noisy, dark, gloomy, complex background, multiple characters, text, watermark, signature, deformed, extra limbs, bad anatomy
+anime, modern, futuristic, sci-fi, chibi, cartoon, cute, childish, deformed, bad anatomy, bad proportions, blurry, noisy, dark, gloomy, complex background, multiple characters, text, watermark, signature, extra limbs, ugly, poorly drawn, low quality, 3D render, photorealistic, neon colors, glowing effects, magical auras, fantasy elements
 ```
 
 ### Parametros recomendados:
-- **Aspect Ratio**: 1:1 (cuadrado) o 3:4 (vertical)
-- **Style**: Illustration / Anime
+- **Aspect Ratio**: 3:4 (vertical) o 2:3 (portrait)
+- **Style**: Classic Animation / Historical Illustration
+- **Model**: Leonardo Diffusion XL o Midjourney v6 (NO anime models)
 - **Consistency**: Usar la misma seed o style reference para todas
 
 ---
 
-## Character Prompts
+## Historical Accuracy Notes
 
-### Existing Characters (1-10)
+Para maximizar la distintividad de cada época, cada prompt incluye:
+- **Materiales específicos** de la época (cuero crudo, bronce, hierro, acero)
+- **Técnicas de construcción** históricas (remaches, forjado, tejido manual)
+- **Colores auténticos** (tierras naturales, no colores saturados)
+- **Desgaste realista** (armaduras abolladas, telas remendadas, armas usadas)
+- **Proporciones culturales** (cada civilización tiene siluetas distintas)
 
-#### 1. Knight
-```
-A brave knight warrior in shiny silver armor, holding a longsword and round shield, determined expression, blue cape flowing, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
+---
 
-#### 2. Archer
-```
-A nimble elven archer with green hood and leather armor, holding a wooden longbow, quiver of arrows on back, alert pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
+## Character Prompts - Base Historical Units
 
-#### 3. Shield Bearer (Tank)
-```
-A heavily armored shield bearer with massive tower shield, thick plate armor, short and stocky build, protective stance, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
+### PREHISTORIC ERA (10,000 BCE - 3,000 BCE)
 
-#### 4. Shadow Blade (Assassin)
+#### 1. Caveman Warrior
 ```
-A mysterious shadow assassin in dark purple cloak, dual daggers, hood covering face, glowing eyes, agile crouching pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A prehistoric caveman warrior wearing animal fur pelts and bone jewelry, wielding a stone-tipped spear and crude hand axe, muscular build from hunting, wild unkempt hair, face paint with natural ochre, barefoot with leather wraps, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 5. Cleric
+#### 2. Tribal Shaman
 ```
-A holy cleric in white and gold robes, holding a glowing staff with cross symbol, gentle smile, divine aura, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 6. Fire Mage
-```
-A powerful fire mage in red and orange robes, casting fireball from one hand, long beard, pointy hat with flame emblem, intense expression, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 7. Spearman
-```
-A disciplined spearman with bronze armor and long spear, rectangular shield, military helmet with crest, ready stance, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 8. War Rider (Cavalry)
-```
-A mounted cavalry warrior on armored warhorse, lance and banner, heavy plate armor, charging pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 9. Stone Giant
-```
-A massive stone giant with rocky skin, moss patches, glowing crystal eyes, huge fists, towering presence, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 10. Goblin Scout
-```
-A sneaky goblin scout with green skin, pointed ears, ragged leather armor, short dagger, mischievous grin, crouching pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A prehistoric tribal shaman wearing elaborate feather headdress and animal skull necklace, holding a carved wooden staff with bone charms, painted ritual symbols on skin, wearing layered animal hides and woven grass, mystical but grounded appearance, wise aged face, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
 ---
 
-### New Characters (11-22)
+### ANCIENT ERA (3,000 BCE - 500 CE)
 
-#### 11. Necromancer
+#### 3. Iron Age Nomad
 ```
-A dark necromancer in tattered black and green robes, holding a skull staff with green glow, pale skin, sunken eyes, hooded cloak, ominous pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 12. Ancient Dragon
-```
-A majestic ancient dragon with red scales, large wings spread, fiery breath, sharp claws, wise glowing eyes, powerful stance, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+An Iron Age nomadic warrior wearing layered wool and leather armor with bronze buckles, carrying a composite bow and short iron sword, wearing a fur-lined cap and wrapped trousers, weathered face from travel, riding gear attached to belt, practical and mobile appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 13. Swamp Witch
+#### 4. Roman Legionary
 ```
-A creepy swamp witch with warty green skin, tattered purple dress, crooked hat, holding a bubbling potion bottle, wicked smile, hunched pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 14. Berserker
-```
-A furious berserker warrior with wild red hair, bare chest with war paint, dual wielding axes, muscular build, raging expression, aggressive stance, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A Roman legionary soldier wearing segmented lorica segmentata plate armor, red wool tunic underneath, carrying large rectangular scutum shield and gladius short sword, wearing iron gallic helmet with cheek guards, caligae sandals with hobnails, clean-shaven face, disciplined military stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 15. Holy Paladin
+#### 5. Roman Centurion
 ```
-A noble holy paladin in ornate white and gold plate armor, large blessed shield, glowing warhammer, divine halo, righteous pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 16. Crossbowman
-```
-A skilled crossbowman with steel crossbow, bolt pouch, leather vest and chainmail, focused expression, aiming pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A Roman centurion officer wearing ornate lorica musculata bronze breastplate with decorative motifs, crimson cloak pinned at shoulder, transverse crest helmet indicating rank, carrying vine staff of command, pugio dagger at belt, armored skirt with leather pteruges, authoritative stance, veteran soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 17. War Monk
+---
+
+### MEDIEVAL ERA (500 CE - 1500 CE) - EUROPE
+
+#### 6. Viking Raider
 ```
-A disciplined war monk in orange and brown robes, bald head, prayer beads, martial arts stance, glowing fists with spiritual energy, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A Viking raider wearing layered wool tunic over chainmail hauberk, round wooden shield with iron boss, bearded axe, wearing leather helmet with nose guard (NOT horned), fur-trimmed cloak, wool leg wraps, practical seafaring gear, rugged weathered face, braided beard, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 18. Dark Warlock
+#### 7. Viking Berserker
 ```
-A sinister dark warlock in crimson and black robes, floating orbs of dark energy, curved horns, glowing red eyes, menacing pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 19. Pegasus Rider
-```
-A graceful pegasus rider on white winged horse, light silver armor, flowing blue cape, spear raised, soaring pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A Viking berserker warrior wearing minimal armor, bare-chested with wolf pelt over shoulders, wielding large Dane axe with two hands, wild eyes and screaming expression, body paint and ritual tattoos, iron armbands and bronze brooches, frenzied combat stance, muscular build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 20. Crystal Golem
+#### 8. Knight Templar
 ```
-A massive crystal golem with translucent blue crystal body, glowing core in chest, geometric facets, heavy stone fists, imposing stance, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
-```
-
-#### 21. Sea Pirate
-```
-A rugged sea pirate with tricorn hat, eyepatch, cutlass sword and flintlock pistol, striped shirt, brown boots, confident swagger, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A Knight Templar wearing white surcoat with red cross pattée over chainmail hauberk, great helm with flat top and eye slits, carrying heater shield with templar seal, longsword at hip, wearing mail coif under helm, armored gauntlets, disciplined upright posture, clean-shaven face showing piety, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
-#### 22. Tribal Shaman
+#### 9. Medieval Witch
 ```
-A tribal shaman with feathered headdress, bone necklace, wooden staff with spirit totems, war paint, mystical aura, dancing pose, 2D cartoon game card art, chibi style, bold outlines, vibrant colors, clean vector-like shading, fantasy theme, full body character centered on white background, front-facing pose, simple geometric shapes, stylized proportions, no background details, game asset style
+A medieval village witch wearing simple wool dress with linen apron, leather belt with herb pouches and glass vials, wooden staff with carved runes, wearing a pointed wool hood, weathered aged face with knowing expression, carrying basket of gathered herbs, practical peasant clothing with mystical accessories, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+#### 10. Crusader Knight
+```
+A Crusader knight wearing chainmail hauberk with blue surcoat displaying cross, kettle helm or early great helm, carrying kite shield with crusader emblem, longsword and mace, mail chausses covering legs, battle-worn armor showing campaign wear, tanned face from eastern sun, determined expression, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+#### 11. Mongol Horse Archer
+```
+A Mongol horse archer wearing layered silk and leather lamellar armor, fur-trimmed hat with ear flaps, composite recurve bow made from horn and sinew, quiver of arrows at belt, wearing practical riding boots and trousers, weathered steppe face with high cheekbones, compact muscular build from riding, alert scanning pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+---
+
+### FEUDAL JAPAN ERA (1185 CE - 1868 CE)
+
+#### 12. Samurai Warrior
+```
+A samurai warrior wearing ornate lacquered lamellar armor (lamellar plates laced together), kabuto helmet with family crest (mon), menpo face mask, carrying katana and wakizashi daisho pair, wearing hakama trousers and waraji sandals, disciplined posture, shaved forehead with topknot, honorable bearing, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+#### 13. Ronin
+```
+A ronin masterless samurai wearing worn and faded armor with mismatched pieces, straw hat (kasa) hiding face, carrying katana with worn wrapping, wearing travel-stained kimono and geta sandals, unshaven face with weary expression, carrying belongings in cloth bundle, wandering swordsman appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+#### 14. Shinobi Ninja
+```
+A shinobi ninja wearing dark indigo-dyed shozoku outfit with hooded mask, lightweight armor hidden under cloth, carrying ninjato straight sword and climbing tools, wearing tabi split-toe boots, carrying shuriken and smoke bombs at belt, crouched stealthy pose, only eyes visible above mask, athletic build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+---
+
+### RENAISSANCE ERA (1400 CE - 1600 CE)
+
+#### 15. Ottoman Janissary
+```
+An Ottoman janissary wearing distinctive white felt borek headdress, blue caftan robe with decorative trim, carrying matchlock musket and kilij curved sword, wearing leather armor over robes, leather boots with pointed toes, disciplined military stance, clean-shaven face with mustache, elite imperial soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+```
+
+#### 16. French Musketeer
+```
+A French musketeer wearing blue cassock with white cross, broad-brimmed hat with feather, carrying wheel-lock musket and rapier sword, wearing leather bandolier with powder charges, leather boots with fold-over cuffs, flamboyant noble bearing, styled mustache and goatee, confident swaggering pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
 ```
 
 ---
@@ -164,45 +166,58 @@ A tribal shaman with feathered headdress, bone necklace, wooden staff with spiri
 ## Workflow for Consistent Results
 
 ### Step 1: Generate Test Image
-1. Toma el prompt del Knight (#1)
-2. Genera 4 variaciones
-3. Elige la que mejor represente el estilo deseado
+1. Toma el prompt del Caveman Warrior (#1) con el estilo Ghibli/histórico
+2. Genera 4 variaciones en Leonardo Diffusion XL o Midjourney v6
+3. Elige la que mejor represente el estilo clásico deseado
 4. Guarda esta imagen como "style_reference.png"
+5. Verifica que tenga: detalle histórico, materiales realistas, colores tierra, sin elementos futuristas
 
 ### Step 2: Usar Style Reference
 - **Leonardo.ai**: Sube style_reference.png como "Image Guidance" con modo "Style Reference"
 - **Midjourney**: Usa `--sref [URL de la imagen]` en cada prompt
+- **Stable Diffusion**: Usa img2img con denoising strength 0.3-0.5
 
 ### Step 3: Batch Generation
 1. Genera cada personaje usando el mismo style reference
 2. Mantén los mismos parámetros (seed, guidance, steps)
 3. Si un personaje no queda consistente, regenera con variaciones del prompt
+4. Verifica que cada época sea visualmente distinta
 
 ### Step 4: Post-Processing
 1. Recorta todas las imágenes al mismo tamaño
 2. Ajusta brillo/contraste uniformemente
 3. Remueve fondos si es necesario (usa remove.bg o similar)
+4. Verifica consistencia de escala entre personajes
 
 ---
 
-## Tips for Consistency
+## Tips for Historical Consistency
 
 1. **Mismo orden de palabras**: Mantén la estructura del prompt idéntica
-2. **Mismos adjetivos de estilo**: Siempre usa "2D cartoon game card art, chibi style, bold outlines"
-3. **Mismo fondo**: Siempre "white background" o "transparent background"
-4. **Misma pose**: Siempre "front-facing pose" o "3/4 view" (elige uno y mantenlo)
-5. **Misma iluminación**: Agrega "soft studio lighting" a todos si quieres luz uniforme
-6. **Seed fija**: En Leonardo.ai, usa la misma seed para todos después de encontrar una buena
+2. **Mismos adjetivos de estilo**: Siempre usa "classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy"
+3. **Mismo fondo**: Siempre "white background" para consistencia
+4. **Misma pose**: Siempre "front-facing pose" para cards
+5. **Misma iluminación**: "warm natural lighting" para todos
+6. **Seed fija**: Usa la misma seed para todos después de encontrar una buena
+7. **Materiales específicos**: Cada prompt menciona materiales de su época
+8. **Colores de época**: Usa solo colores disponibles en cada período histórico
+9. **Desgaste realista**: Todos deben mostrar uso y edad apropiados
+10. **Sin elementos anacrónicos**: Revisa que no haya cremalleras, botones modernos, etc.
 
 ---
 
 ## Alternative: Custom LoRA (Advanced)
 
 Si quieres máxima consistencia:
-1. Genera 10-15 imágenes base con el estilo deseado
-2. Entrena un LoRA en Leonardo.ai o Civitai
+1. Genera 10-15 imágenes base con el estilo Ghibli/histórico deseado
+2. Entrena un LoRA en Leonardo.ai o Civitai usando estas imágenes
 3. Usa ese LoRA para generar todos los personajes
 4. Resultado: 95%+ consistencia de estilo
+
+**Modelos recomendados para LoRA**:
+- Leonardo Diffusion XL (base para entrenar)
+- Stable Diffusion XL (excelente para realismo histórico)
+- Midjourney v6 (si puedes pagar, mejor calidad)
 
 **Costo**: ~$5-10 USD para entrenamiento
 **Tiempo**: 2-4 horas de entrenamiento
@@ -213,26 +228,34 @@ Si quieres máxima consistencia:
 
 Guarda las imágenes generadas como:
 ```
-assets/cards/knight.png
-assets/cards/archer.png
-assets/cards/tank.png
-assets/cards/assassin.png
-assets/cards/cleric.png
-assets/cards/mage.png
-assets/cards/spearman.png
-assets/cards/cavalry.png
-assets/cards/giant.png
-assets/cards/goblin.png
-assets/cards/necromancer.png
-assets/cards/dragon.png
-assets/cards/witch.png
-assets/cards/berserker.png
-assets/cards/paladin.png
-assets/cards/crossbowman.png
-assets/cards/monk.png
-assets/cards/warlock.png
-assets/cards/pegasus.png
-assets/cards/golem.png
-assets/cards/pirate.png
-assets/cards/shaman.png
+assets/cards/caveman.png
+assets/cards/tribal_shaman.png
+assets/cards/iron_nomad.png
+assets/cards/roman_legionary.png
+assets/cards/roman_centurion.png
+assets/cards/viking_raider.png
+assets/cards/viking_berserker.png
+assets/cards/knight_templar.png
+assets/cards/medieval_witch.png
+assets/cards/samurai.png
+assets/cards/ronin.png
+assets/cards/ninja.png
+assets/cards/mongol_archer.png
+assets/cards/crusader.png
+assets/cards/ottoman_janissary.png
+assets/cards/musketeer.png
+```
+
+---
+
+## Future: Legendary Characters
+
+Cuando agregues personajes legendarios, mantén el mismo style guide pero agrega:
+- "legendary hero aura" o "mythical presence"
+- "iconic historical appearance"
+- "famous recognizable features"
+
+Ejemplo para Gilgamesh:
+```
+Gilgamesh, legendary Sumerian king, wearing ornate golden armor with lion motifs, holding divine weapon, majestic beard, crown of horns, heroic imposing stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate ancient Mesopotamian costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail, legendary hero aura, iconic historical appearance
 ```

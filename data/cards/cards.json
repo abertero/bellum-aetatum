@@ -1,290 +1,228 @@
 {
-    "_comment": "Card database. Each card has: id (unique identifier), name (display name), image (texture path), stats (gameplay values).",
+    "_comment": "Card database. Each card has: id (unique identifier), name (display name), era (historical period), image (texture path), stats (gameplay values).",
     "cards": [
         {
-            "id": "knight_001",
-            "name": "Knight",
-            "image": "res://assets/cards/knight.png",
+            "id": "caveman_001",
+            "name": "Caveman Warrior",
+            "era": "prehistoric",
+            "image": "res://assets/cards/caveman.png",
             "stats": {
-                "hp": 100,
-                "attack": 25,
+                "hp": 90,
+                "attack": 20,
                 "range": 1,
                 "speed": 50,
-                "cost": 3,
-                "attack_speed": 1.0
-            }
-        },
-        {
-            "id": "archer_001",
-            "name": "Archer",
-            "image": "res://assets/cards/archer.png",
-            "stats": {
-                "hp": 60,
-                "attack": 20,
-                "range": 4,
-                "speed": 40,
                 "cost": 2,
                 "attack_speed": 1.2
             }
         },
         {
-            "id": "tank_001",
-            "name": "Shield Bearer",
-            "image": "res://assets/cards/tank.png",
+            "id": "tribal_shaman_001",
+            "name": "Tribal Shaman",
+            "era": "prehistoric",
+            "image": "res://assets/cards/tribal_shaman.png",
             "stats": {
-                "hp": 200,
-                "attack": 10,
-                "range": 1,
-                "speed": 30,
-                "cost": 4,
-                "attack_speed": 0.6
-            }
-        },
-        {
-            "id": "assassin_001",
-            "name": "Shadow Blade",
-            "image": "res://assets/cards/assassin.png",
-            "stats": {
-                "hp": 50,
-                "attack": 40,
-                "range": 1,
-                "speed": 80,
-                "cost": 4,
-                "attack_speed": 2.0
-            }
-        },
-        {
-            "id": "cleric_001",
-            "name": "Cleric",
-            "image": "res://assets/cards/cleric.png",
-            "stats": {
-                "hp": 70,
-                "attack": 15,
+                "hp": 65,
+                "attack": 18,
                 "range": 3,
                 "speed": 45,
                 "cost": 3,
-                "attack_speed": 0.8
+                "attack_speed": 1.0
             }
         },
         {
-            "id": "mage_001",
-            "name": "Fire Mage",
-            "image": "res://assets/cards/mage.png",
+            "id": "iron_nomad_001",
+            "name": "Iron Age Nomad",
+            "era": "ancient",
+            "image": "res://assets/cards/iron_nomad.png",
             "stats": {
-                "hp": 55,
-                "attack": 35,
-                "range": 5,
-                "speed": 35,
-                "cost": 5,
-                "attack_speed": 0.7
-            }
-        },
-        {
-            "id": "spearman_001",
-            "name": "Spearman",
-            "image": "res://assets/cards/spearman.png",
-            "stats": {
-                "hp": 80,
+                "hp": 75,
                 "attack": 22,
                 "range": 2,
-                "speed": 55,
-                "cost": 2,
+                "speed": 65,
+                "cost": 3,
                 "attack_speed": 1.3
             }
         },
         {
-            "id": "cavalry_001",
-            "name": "War Rider",
-            "image": "res://assets/cards/cavalry.png",
+            "id": "roman_legionary_001",
+            "name": "Roman Legionary",
+            "era": "ancient",
+            "image": "res://assets/cards/roman_legionary.png",
             "stats": {
-                "hp": 90,
+                "hp": 120,
+                "attack": 25,
+                "range": 1,
+                "speed": 45,
+                "cost": 4,
+                "attack_speed": 1.0
+            }
+        },
+        {
+            "id": "roman_centurion_001",
+            "name": "Roman Centurion",
+            "era": "ancient",
+            "image": "res://assets/cards/roman_centurion.png",
+            "stats": {
+                "hp": 150,
                 "attack": 30,
                 "range": 1,
-                "speed": 90,
-                "cost": 4,
-                "attack_speed": 1.5
-            }
-        },
-        {
-            "id": "giant_001",
-            "name": "Stone Giant",
-            "image": "res://assets/cards/giant.png",
-            "stats": {
-                "hp": 300,
-                "attack": 15,
-                "range": 1,
-                "speed": 20,
-                "cost": 6,
-                "attack_speed": 0.4
-            }
-        },
-        {
-            "id": "goblin_001",
-            "name": "Goblin Scout",
-            "image": "res://assets/cards/goblin.png",
-            "stats": {
-                "hp": 40,
-                "attack": 12,
-                "range": 1,
-                "speed": 70,
-                "cost": 1,
-                "attack_speed": 1.8
-            }
-        },
-        {
-            "id": "necromancer_001",
-            "name": "Necromancer",
-            "image": "res://assets/cards/necromancer.png",
-            "stats": {
-                "hp": 65,
-                "attack": 28,
-                "range": 4,
-                "speed": 35,
+                "speed": 40,
                 "cost": 5,
                 "attack_speed": 0.9
             }
         },
         {
-            "id": "dragon_001",
-            "name": "Ancient Dragon",
-            "image": "res://assets/cards/dragon.png",
+            "id": "viking_raider_001",
+            "name": "Viking Raider",
+            "era": "medieval",
+            "image": "res://assets/cards/viking_raider.png",
             "stats": {
-                "hp": 250,
-                "attack": 45,
-                "range": 3,
-                "speed": 60,
-                "cost": 8,
-                "attack_speed": 1.2
-            }
-        },
-        {
-            "id": "witch_001",
-            "name": "Swamp Witch",
-            "image": "res://assets/cards/witch.png",
-            "stats": {
-                "hp": 55,
-                "attack": 22,
-                "range": 4,
-                "speed": 40,
+                "hp": 100,
+                "attack": 28,
+                "range": 1,
+                "speed": 55,
                 "cost": 4,
-                "attack_speed": 1.0
+                "attack_speed": 1.4
             }
         },
         {
-            "id": "berserker_001",
-            "name": "Berserker",
-            "image": "res://assets/cards/berserker.png",
+            "id": "viking_berserker_001",
+            "name": "Viking Berserker",
+            "era": "medieval",
+            "image": "res://assets/cards/viking_berserker.png",
             "stats": {
                 "hp": 85,
                 "attack": 38,
                 "range": 1,
-                "speed": 65,
+                "speed": 70,
                 "cost": 5,
                 "attack_speed": 1.6
             }
         },
         {
-            "id": "paladin_001",
-            "name": "Holy Paladin",
-            "image": "res://assets/cards/paladin.png",
+            "id": "knight_templar_001",
+            "name": "Knight Templar",
+            "era": "medieval",
+            "image": "res://assets/cards/knight_templar.png",
             "stats": {
-                "hp": 180,
-                "attack": 20,
+                "hp": 140,
+                "attack": 26,
                 "range": 1,
                 "speed": 40,
-                "cost": 6,
+                "cost": 5,
+                "attack_speed": 0.9
+            }
+        },
+        {
+            "id": "medieval_witch_001",
+            "name": "Medieval Witch",
+            "era": "medieval",
+            "image": "res://assets/cards/medieval_witch.png",
+            "stats": {
+                "hp": 60,
+                "attack": 30,
+                "range": 4,
+                "speed": 40,
+                "cost": 4,
                 "attack_speed": 0.8
             }
         },
         {
-            "id": "crossbowman_001",
-            "name": "Crossbowman",
-            "image": "res://assets/cards/crossbowman.png",
+            "id": "samurai_001",
+            "name": "Samurai Warrior",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/samurai.png",
             "stats": {
-                "hp": 70,
-                "attack": 30,
-                "range": 5,
-                "speed": 30,
-                "cost": 3,
-                "attack_speed": 0.6
-            }
-        },
-        {
-            "id": "monk_001",
-            "name": "War Monk",
-            "image": "res://assets/cards/monk.png",
-            "stats": {
-                "hp": 75,
-                "attack": 25,
-                "range": 1,
-                "speed": 70,
-                "cost": 3,
-                "attack_speed": 1.4
-            }
-        },
-        {
-            "id": "warlock_001",
-            "name": "Dark Warlock",
-            "image": "res://assets/cards/warlock.png",
-            "stats": {
-                "hp": 60,
+                "hp": 110,
                 "attack": 32,
-                "range": 4,
-                "speed": 38,
+                "range": 1,
+                "speed": 60,
                 "cost": 5,
-                "attack_speed": 0.85
+                "attack_speed": 1.5
             }
         },
         {
-            "id": "pegasus_001",
-            "name": "Pegasus Rider",
-            "image": "res://assets/cards/pegasus.png",
+            "id": "ronin_001",
+            "name": "Ronin",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/ronin.png",
             "stats": {
-                "hp": 70,
-                "attack": 28,
+                "hp": 95,
+                "attack": 35,
                 "range": 1,
-                "speed": 95,
+                "speed": 75,
                 "cost": 5,
                 "attack_speed": 1.7
             }
         },
         {
-            "id": "golem_001",
-            "name": "Crystal Golem",
-            "image": "res://assets/cards/golem.png",
+            "id": "ninja_001",
+            "name": "Shinobi Ninja",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/ninja.png",
             "stats": {
-                "hp": 280,
-                "attack": 18,
+                "hp": 70,
+                "attack": 40,
                 "range": 1,
-                "speed": 25,
-                "cost": 7,
-                "attack_speed": 0.5
+                "speed": 85,
+                "cost": 5,
+                "attack_speed": 2.0
             }
         },
         {
-            "id": "pirate_001",
-            "name": "Sea Pirate",
-            "image": "res://assets/cards/pirate.png",
+            "id": "mongol_archer_001",
+            "name": "Mongol Horse Archer",
+            "era": "medieval",
+            "image": "res://assets/cards/mongol_archer.png",
             "stats": {
                 "hp": 80,
-                "attack": 26,
-                "range": 2,
-                "speed": 55,
-                "cost": 3,
-                "attack_speed": 1.3
+                "attack": 24,
+                "range": 5,
+                "speed": 80,
+                "cost": 4,
+                "attack_speed": 1.2
             }
         },
         {
-            "id": "shaman_001",
-            "name": "Tribal Shaman",
-            "image": "res://assets/cards/shaman.png",
+            "id": "crusader_001",
+            "name": "Crusader Knight",
+            "era": "medieval",
+            "image": "res://assets/cards/crusader.png",
             "stats": {
-                "hp": 68,
-                "attack": 18,
-                "range": 3,
+                "hp": 130,
+                "attack": 28,
+                "range": 1,
                 "speed": 45,
-                "cost": 3,
-                "attack_speed": 1.1
+                "cost": 5,
+                "attack_speed": 1.0
+            }
+        },
+        {
+            "id": "ottoman_janissary_001",
+            "name": "Ottoman Janissary",
+            "era": "renaissance",
+            "image": "res://assets/cards/ottoman_janissary.png",
+            "stats": {
+                "hp": 105,
+                "attack": 30,
+                "range": 3,
+                "speed": 50,
+                "cost": 4,
+                "attack_speed": 0.9
+            }
+        },
+        {
+            "id": "musketeer_001",
+            "name": "French Musketeer",
+            "era": "renaissance",
+            "image": "res://assets/cards/musketeer.png",
+            "stats": {
+                "hp": 90,
+                "attack": 32,
+                "range": 4,
+                "speed": 60,
+                "cost": 4,
+                "attack_speed": 0.7
             }
         }
     ]
