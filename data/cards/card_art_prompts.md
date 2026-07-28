@@ -3,16 +3,24 @@
 ## Recommended AI Tool
 
 ### Primary: Leonardo.ai
-- **Model**: Leonardo Diffusion XL o Leonardo Vision XL
+- **Model**: Lucid Origin (modelo más nuevo y recomendado)
 - **Feature clave**: "Style Reference" - sube una imagen base y referencia con Image Guidance
-- **Ventaja**: Excelente para estilos clásicos e históricos, permite entrenar LoRAs personalizados
+- **Ventaja**: Excelente para estilos clásicos e históricos, alta fidelidad y adherencia al prompt
 - **Costo**: 150 tokens/dia gratis (suficiente para ~30 imagenes/dia)
 - **Configuracion recomendada**:
   - Resolution: 768x1024 (portrait 3:4) o 832x1216 (portrait 2:3)
   - Guidance Scale: 7-9
   - Steps: 30-40
   - Tiling: OFF
-  - Model: Leonardo Diffusion XL para mejor detalle histórico
+  - Style: Cinematic (mejor opción disponible)
+  - Alchemy: OFF
+  - PhotoReal: OFF
+  - Prompt Magic: ON (v3 si está disponible)
+
+### Alternative Models en Leonardo.ai:
+- **Phoenix 1.0**: "Precise prompt adherence with reliable text handling" - buena alternativa si Lucid Origin no funciona
+- **Seedream 4.5**: "Rich, high-quality images with refined visual detail" - excelente calidad visual
+- **NO usar**: Lucid Realism (es fotorrealista), modelos de anime, ni modelos 3D
 
 ### Alternative: Midjourney
 - **Modo**: `--v 6.0` (NO usar --niji, es muy anime moderno)
@@ -45,28 +53,39 @@ character sheet, turnaround, multiple views, multiple angles, reference sheet, e
 ### Parametros recomendados:
 - **Aspect Ratio**: 3:4 (vertical) o 2:3 (portrait)
 - **Style**: Classic Animation / Historical Illustration
-- **Model**: Leonardo Diffusion XL (NO usar Lifelike, NO usar Vision XL)
+- **Model**: Lucid Origin (NO usar Lucid Realism, NO usar modelos de anime)
 - **Consistency**: Usar la misma seed o style reference para todas
 
 ---
 
 ## Leonardo.ai - Modelo Correcto
 
-### Cómo encontrar Leonardo Diffusion XL:
+### Cómo encontrar Lucid Origin:
 1. Ve a "Image Generation" en el menú lateral
-2. En la parte superior, haz click en el dropdown de modelos (dice "Leonardo Diffusion XL" por defecto)
-3. Selecciona **"Leonardo Diffusion XL"** de la lista
-4. NO uses: Lifelike, Vision XL, PhotoXL, Anime XL, ni 3D Animation Style
+2. En la parte superior, haz click en el dropdown de modelos
+3. Selecciona **"Lucid Origin"** de la lista (es el modelo featured/new)
+4. NO uses: Lucid Realism, Phoenix 0.9, modelos de anime, ni 3D Animation Style
+
+### Modelos disponibles (actualizado 2026):
+- **Lucid Origin** (RECOMENDADO) - "High-fidelity images with strong prompt adherence"
+- **Phoenix 1.0** (ALTERNATIVA) - "Precise prompt adherence with reliable text handling"
+- **Seedream 4.5** (ALTERNATIVA) - "Rich, high-quality images with refined visual detail"
+- **NO usar**: Lucid Realism, GPT-Image, Nano Banana, FLUX, Ideogram (no son adecuados para este estilo)
 
 ### Configuración recomendada en Leonardo:
-- **Model**: Leonardo Diffusion XL
-- **Preset**: Cinematic o Illustration (NO Character Sheet)
+- **Model**: Lucid Origin
+- **Style**: Cinematic (es la mejor opción disponible, funciona bien para estilo clásico)
 - **Resolution**: 768x1024 (3:4 portrait)
 - **Guidance Scale**: 7
 - **Steps**: 30
 - **Alchemy**: OFF (causa más variaciones indeseadas)
 - **PhotoReal**: OFF
-- **Prompt Magic**: ON (v3)
+- **Prompt Magic**: ON (v3 si está disponible)
+
+### Nota sobre "Auto" mode:
+- Si ves una opción "Auto" que no muestra precio, probablemente sea un selector automático de modelo
+- NO lo uses - selecciona manualmente "Lucid Origin" para tener control total
+- Los modelos "unlimited" (anime, 3D) son ilimitados pero no adecuados para nuestro estilo histórico
 
 ---
 
@@ -187,7 +206,7 @@ A French musketeer wearing blue cassock with white cross, broad-brimmed hat with
 
 ### Step 1: Generate Test Image
 1. Toma el prompt del Caveman Warrior (#1) con el estilo Ghibli/histórico
-2. Genera 4 variaciones en **Leonardo Diffusion XL** (NO Lifelike, NO Vision XL)
+2. Genera 4 variaciones en **Lucid Origin** (NO Lifelike, NO modelos de anime)
 3. Elige la que mejor represente el estilo clásico deseado
 4. Guarda esta imagen como "style_reference.png"
 5. Verifica que tenga: detalle histórico, materiales realistas, colores tierra, sin elementos futuristas
@@ -236,9 +255,10 @@ Si quieres máxima consistencia:
 4. Resultado: 95%+ consistencia de estilo
 
 **Modelos recomendados para LoRA**:
-- Leonardo Diffusion XL (base para entrenar) - MEJOR para este estilo
-- Stable Diffusion XL (excelente para realismo histórico)
-- NO usar: Lifelike, Vision XL, PhotoXL, Anime XL
+- Lucid Origin (base para entrenar) - MEJOR para este estilo
+- Phoenix 1.0 (alternativa sólida)
+- Seedream 4.5 (excelente calidad visual)
+- NO usar: Lucid Realism, modelos de anime, modelos 3D
 
 **Costo**: ~$5-10 USD para entrenamiento
 **Tiempo**: 2-4 horas de entrenamiento
