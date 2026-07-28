@@ -34,3 +34,46 @@ func get_allied_count() -> int:
 
 func get_enemy_count() -> int:
 	return enemy_units.size()
+
+
+func remove_unit(unit: Unit) -> void:
+	allied_units.erase(unit)
+	enemy_units.erase(unit)
+
+
+func get_frontline_allied() -> Unit:
+	for unit in allied_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			return unit
+	return null
+
+
+func get_frontline_enemy() -> Unit:
+	for unit in enemy_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			return unit
+	return null
+
+
+func has_frontline_melee_allied() -> bool:
+	var frontline: Unit = get_frontline_allied()
+	return frontline != null and frontline.is_melee()
+
+
+func has_frontline_melee_enemy() -> bool:
+	var frontline: Unit = get_frontline_enemy()
+	return frontline != null and frontline.is_melee()
+
+
+func cleanup() -> void:
+	var valid_allied: Array[Unit] = []
+	for unit in allied_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			valid_allied.append(unit)
+	allied_units = valid_allied
+
+	var valid_enemy: Array[Unit] = []
+	for unit in enemy_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			valid_enemy.append(unit)
+	enemy_units = valid_enemy

@@ -5,6 +5,7 @@ enum State {
 	MOVING,
 	WAITING,
 	BLOCKED,
+	ATTACKING,
 	DEAD
 }
 
@@ -17,6 +18,8 @@ static func to_str(state: State) -> String:
 			return "Waiting"
 		State.BLOCKED:
 			return "Blocked"
+		State.ATTACKING:
+			return "Attacking"
 		State.DEAD:
 			return "Dead"
 		_:

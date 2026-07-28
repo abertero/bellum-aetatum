@@ -10,6 +10,7 @@ const ENEMY_SPAWN_INTERVAL: float = 3.0
 var _stage_data: Dictionary
 var _spawn_manager: SpawnManager
 var _formation_manager: FormationManager
+var _combat_system: CombatSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
@@ -20,6 +21,7 @@ func _ready() -> void:
 	_setup_battlefield()
 	_setup_spawn_manager()
 	_setup_formation_manager()
+	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
 
@@ -86,6 +88,12 @@ func _setup_formation_manager() -> void:
 	var formation_spacing: float = float(_stage_data.get("formation_spacing", 32.0))
 	_formation_manager.initialize(formation_spacing)
 	add_child(_formation_manager)
+
+
+func _setup_combat_system() -> void:
+	_combat_system = CombatSystem.new()
+	_combat_system.initialize(_formation_manager)
+	add_child(_combat_system)
 
 
 func _load_decks() -> void:

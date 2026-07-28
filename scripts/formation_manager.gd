@@ -12,14 +12,27 @@ func initialize(formation_spacing: float) -> void:
 	_formation_spacing = formation_spacing
 
 
+func get_battle_groups() -> Array[BattleGroup]:
+	return _battle_groups
+
+
 func register_unit(unit: Unit) -> void:
 	if unit not in _all_units:
 		_all_units.append(unit)
 
 
 func _physics_process(_delta: float) -> void:
+	_cleanup_invalid_units()
 	_detect_collisions()
 	_update_formations()
+
+
+func _cleanup_invalid_units() -> void:
+	var valid_units: Array[Unit] = []
+	for unit in _all_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			valid_units.append(unit)
+	_all_units = valid_units
 
 
 func _detect_collisions() -> void:

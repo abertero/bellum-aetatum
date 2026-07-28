@@ -8,5 +8,6 @@ func create_from_dictionary(data: Dictionary) -> UnitStats:
 	var range: int = int(data.get("range", 0))
 	var speed: float = float(data.get("speed", 0.0))
 	var cost: int = int(data.get("cost", 0))
+	var attack_speed: float = float(data.get("attack_speed", 1.0))
 
-	return UnitStats.new(hp, attack, range, speed, cost)
+	return UnitStats.new(hp, attack, range, speed, cost, attack_speed)

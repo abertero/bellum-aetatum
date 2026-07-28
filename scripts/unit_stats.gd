@@ -6,6 +6,7 @@ var attack: int = 0
 var range: int = 0
 var speed: float = 0.0
 var cost: int = 0
+var attack_speed: float = 1.0
 
 
 func _init(
@@ -13,10 +14,12 @@ func _init(
 	p_attack: int = 0,
 	p_range: int = 0,
 	p_speed: float = 0.0,
-	p_cost: int = 0
+	p_cost: int = 0,
+	p_attack_speed: float = 1.0
 ) -> void:
 	hp = p_hp
 	attack = p_attack
 	range = p_range
 	speed = p_speed
 	cost = p_cost
+	attack_speed = p_attack_speed
