@@ -34,19 +34,39 @@
 Este es el anchor de estilo que DEBE aparecer en cada prompt para mantener consistencia:
 
 ```
-classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes and armor, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail, no anachronistic elements
+classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes and armor, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration, no multiple views, no turnaround sheet, no equipment breakdown
 ```
 
 ### Negative Prompt (usar siempre):
 ```
-anime, modern, futuristic, sci-fi, chibi, cartoon, cute, childish, deformed, bad anatomy, bad proportions, blurry, noisy, dark, gloomy, complex background, multiple characters, text, watermark, signature, extra limbs, ugly, poorly drawn, low quality, 3D render, photorealistic, neon colors, glowing effects, magical auras, fantasy elements
+character sheet, turnaround, multiple views, multiple angles, reference sheet, equipment breakdown, armor pieces separated, weapon details sheet, concept art sheet, design sheet, blueprint, technical drawing, anime, modern, futuristic, sci-fi, chibi, cartoon, cute, childish, deformed, bad anatomy, bad proportions, blurry, noisy, dark, gloomy, complex background, multiple characters, text, watermark, signature, extra limbs, ugly, poorly drawn, low quality, 3D render, photorealistic, neon colors, glowing effects, magical auras, fantasy elements
 ```
 
 ### Parametros recomendados:
 - **Aspect Ratio**: 3:4 (vertical) o 2:3 (portrait)
 - **Style**: Classic Animation / Historical Illustration
-- **Model**: Leonardo Diffusion XL o Midjourney v6 (NO anime models)
+- **Model**: Leonardo Diffusion XL (NO usar Lifelike, NO usar Vision XL)
 - **Consistency**: Usar la misma seed o style reference para todas
+
+---
+
+## Leonardo.ai - Modelo Correcto
+
+### Cómo encontrar Leonardo Diffusion XL:
+1. Ve a "Image Generation" en el menú lateral
+2. En la parte superior, haz click en el dropdown de modelos (dice "Leonardo Diffusion XL" por defecto)
+3. Selecciona **"Leonardo Diffusion XL"** de la lista
+4. NO uses: Lifelike, Vision XL, PhotoXL, Anime XL, ni 3D Animation Style
+
+### Configuración recomendada en Leonardo:
+- **Model**: Leonardo Diffusion XL
+- **Preset**: Cinematic o Illustration (NO Character Sheet)
+- **Resolution**: 768x1024 (3:4 portrait)
+- **Guidance Scale**: 7
+- **Steps**: 30
+- **Alchemy**: OFF (causa más variaciones indeseadas)
+- **PhotoReal**: OFF
+- **Prompt Magic**: ON (v3)
 
 ---
 
@@ -67,12 +87,12 @@ Para maximizar la distintividad de cada época, cada prompt incluye:
 
 #### 1. Caveman Warrior
 ```
-A prehistoric caveman warrior wearing animal fur pelts and bone jewelry, wielding a stone-tipped spear and crude hand axe, muscular build from hunting, wild unkempt hair, face paint with natural ochre, barefoot with leather wraps, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A prehistoric caveman warrior wearing animal fur pelts and bone jewelry, wielding a stone-tipped spear and crude hand axe, muscular build from hunting, wild unkempt hair, face paint with natural ochre, barefoot with leather wraps, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 2. Tribal Shaman
 ```
-A prehistoric tribal shaman wearing elaborate feather headdress and animal skull necklace, holding a carved wooden staff with bone charms, painted ritual symbols on skin, wearing layered animal hides and woven grass, mystical but grounded appearance, wise aged face, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A prehistoric tribal shaman wearing elaborate feather headdress and animal skull necklace, holding a carved wooden staff with bone charms, painted ritual symbols on skin, wearing layered animal hides and woven grass, mystical but grounded appearance, wise aged face, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 ---
@@ -81,17 +101,17 @@ A prehistoric tribal shaman wearing elaborate feather headdress and animal skull
 
 #### 3. Iron Age Nomad
 ```
-An Iron Age nomadic warrior wearing layered wool and leather armor with bronze buckles, carrying a composite bow and short iron sword, wearing a fur-lined cap and wrapped trousers, weathered face from travel, riding gear attached to belt, practical and mobile appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+An Iron Age nomadic warrior wearing layered wool and leather armor with bronze buckles, carrying a composite bow and short iron sword, wearing a fur-lined cap and wrapped trousers, weathered face from travel, riding gear attached to belt, practical and mobile appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 4. Roman Legionary
 ```
-A Roman legionary soldier wearing segmented lorica segmentata plate armor, red wool tunic underneath, carrying large rectangular scutum shield and gladius short sword, wearing iron gallic helmet with cheek guards, caligae sandals with hobnails, clean-shaven face, disciplined military stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Roman legionary soldier wearing segmented lorica segmentata plate armor, red wool tunic underneath, carrying large rectangular scutum shield and gladius short sword, wearing iron gallic helmet with cheek guards, caligae sandals with hobnails, clean-shaven face, disciplined military stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 5. Roman Centurion
 ```
-A Roman centurion officer wearing ornate lorica musculata bronze breastplate with decorative motifs, crimson cloak pinned at shoulder, transverse crest helmet indicating rank, carrying vine staff of command, pugio dagger at belt, armored skirt with leather pteruges, authoritative stance, veteran soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Roman centurion officer wearing ornate lorica musculata bronze breastplate with decorative motifs, crimson cloak pinned at shoulder, transverse crest helmet indicating rank, carrying vine staff of command, pugio dagger at belt, armored skirt with leather pteruges, authoritative stance, veteran soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 ---
@@ -100,32 +120,32 @@ A Roman centurion officer wearing ornate lorica musculata bronze breastplate wit
 
 #### 6. Viking Raider
 ```
-A Viking raider wearing layered wool tunic over chainmail hauberk, round wooden shield with iron boss, bearded axe, wearing leather helmet with nose guard (NOT horned), fur-trimmed cloak, wool leg wraps, practical seafaring gear, rugged weathered face, braided beard, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Viking raider wearing layered wool tunic over chainmail hauberk, round wooden shield with iron boss, bearded axe, wearing leather helmet with nose guard (NOT horned), fur-trimmed cloak, wool leg wraps, practical seafaring gear, rugged weathered face, braided beard, aggressive stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 7. Viking Berserker
 ```
-A Viking berserker warrior wearing minimal armor, bare-chested with wolf pelt over shoulders, wielding large Dane axe with two hands, wild eyes and screaming expression, body paint and ritual tattoos, iron armbands and bronze brooches, frenzied combat stance, muscular build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Viking berserker warrior wearing minimal armor, bare-chested with wolf pelt over shoulders, wielding large Dane axe with two hands, wild eyes and screaming expression, body paint and ritual tattoos, iron armbands and bronze brooches, frenzied combat stance, muscular build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 8. Knight Templar
 ```
-A Knight Templar wearing white surcoat with red cross pattée over chainmail hauberk, great helm with flat top and eye slits, carrying heater shield with templar seal, longsword at hip, wearing mail coif under helm, armored gauntlets, disciplined upright posture, clean-shaven face showing piety, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Knight Templar wearing white surcoat with red cross pattée over chainmail hauberk, great helm with flat top and eye slits, carrying heater shield with templar seal, longsword at hip, wearing mail coif under helm, armored gauntlets, disciplined upright posture, clean-shaven face showing piety, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 9. Medieval Witch
 ```
-A medieval village witch wearing simple wool dress with linen apron, leather belt with herb pouches and glass vials, wooden staff with carved runes, wearing a pointed wool hood, weathered aged face with knowing expression, carrying basket of gathered herbs, practical peasant clothing with mystical accessories, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A medieval village witch wearing simple wool dress with linen apron, leather belt with herb pouches and glass vials, wooden staff with carved runes, wearing a pointed wool hood, weathered aged face with knowing expression, carrying basket of gathered herbs, practical peasant clothing with mystical accessories, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 10. Crusader Knight
 ```
-A Crusader knight wearing chainmail hauberk with blue surcoat displaying cross, kettle helm or early great helm, carrying kite shield with crusader emblem, longsword and mace, mail chausses covering legs, battle-worn armor showing campaign wear, tanned face from eastern sun, determined expression, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Crusader knight wearing chainmail hauberk with blue surcoat displaying cross, kettle helm or early great helm, carrying kite shield with crusader emblem, longsword and mace, mail chausses covering legs, battle-worn armor showing campaign wear, tanned face from eastern sun, determined expression, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 11. Mongol Horse Archer
 ```
-A Mongol horse archer wearing layered silk and leather lamellar armor, fur-trimmed hat with ear flaps, composite recurve bow made from horn and sinew, quiver of arrows at belt, wearing practical riding boots and trousers, weathered steppe face with high cheekbones, compact muscular build from riding, alert scanning pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A Mongol horse archer wearing layered silk and leather lamellar armor, fur-trimmed hat with ear flaps, composite recurve bow made from horn and sinew, quiver of arrows at belt, wearing practical riding boots and trousers, weathered steppe face with high cheekbones, compact muscular build from riding, alert scanning pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 ---
@@ -134,17 +154,17 @@ A Mongol horse archer wearing layered silk and leather lamellar armor, fur-trimm
 
 #### 12. Samurai Warrior
 ```
-A samurai warrior wearing ornate lacquered lamellar armor (lamellar plates laced together), kabuto helmet with family crest (mon), menpo face mask, carrying katana and wakizashi daisho pair, wearing hakama trousers and waraji sandals, disciplined posture, shaved forehead with topknot, honorable bearing, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A samurai warrior wearing ornate lacquered lamellar armor (lamellar plates laced together), kabuto helmet with family crest (mon), menpo face mask, carrying katana and wakizashi daisho pair, wearing hakama trousers and waraji sandals, disciplined posture, shaved forehead with topknot, honorable bearing, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 13. Ronin
 ```
-A ronin masterless samurai wearing worn and faded armor with mismatched pieces, straw hat (kasa) hiding face, carrying katana with worn wrapping, wearing travel-stained kimono and geta sandals, unshaven face with weary expression, carrying belongings in cloth bundle, wandering swordsman appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A ronin masterless samurai wearing worn and faded armor with mismatched pieces, straw hat (kasa) hiding face, carrying katana with worn wrapping, wearing travel-stained kimono and geta sandals, unshaven face with weary expression, carrying belongings in cloth bundle, wandering swordsman appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 14. Shinobi Ninja
 ```
-A shinobi ninja wearing dark indigo-dyed shozoku outfit with hooded mask, lightweight armor hidden under cloth, carrying ninjato straight sword and climbing tools, wearing tabi split-toe boots, carrying shuriken and smoke bombs at belt, crouched stealthy pose, only eyes visible above mask, athletic build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A shinobi ninja wearing dark indigo-dyed shozoku outfit with hooded mask, lightweight armor hidden under cloth, carrying ninjato straight sword and climbing tools, wearing tabi split-toe boots, carrying shuriken and smoke bombs at belt, crouched stealthy pose, only eyes visible above mask, athletic build, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 ---
@@ -153,12 +173,12 @@ A shinobi ninja wearing dark indigo-dyed shozoku outfit with hooded mask, lightw
 
 #### 15. Ottoman Janissary
 ```
-An Ottoman janissary wearing distinctive white felt borek headdress, blue caftan robe with decorative trim, carrying matchlock musket and kilij curved sword, wearing leather armor over robes, leather boots with pointed toes, disciplined military stance, clean-shaven face with mustache, elite imperial soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+An Ottoman janissary wearing distinctive white felt borek headdress, blue caftan robe with decorative trim, carrying matchlock musket and kilij curved sword, wearing leather armor over robes, leather boots with pointed toes, disciplined military stance, clean-shaven face with mustache, elite imperial soldier appearance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 #### 16. French Musketeer
 ```
-A French musketeer wearing blue cassock with white cross, broad-brimmed hat with feather, carrying wheel-lock musket and rapier sword, wearing leather bandolier with powder charges, leather boots with fold-over cuffs, flamboyant noble bearing, styled mustache and goatee, confident swaggering pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail
+A French musketeer wearing blue cassock with white cross, broad-brimmed hat with feather, carrying wheel-lock musket and rapier sword, wearing leather bandolier with powder charges, leather boots with fold-over cuffs, flamboyant noble bearing, styled mustache and goatee, confident swaggering pose, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration
 ```
 
 ---
@@ -167,10 +187,11 @@ A French musketeer wearing blue cassock with white cross, broad-brimmed hat with
 
 ### Step 1: Generate Test Image
 1. Toma el prompt del Caveman Warrior (#1) con el estilo Ghibli/histórico
-2. Genera 4 variaciones en Leonardo Diffusion XL o Midjourney v6
+2. Genera 4 variaciones en **Leonardo Diffusion XL** (NO Lifelike, NO Vision XL)
 3. Elige la que mejor represente el estilo clásico deseado
 4. Guarda esta imagen como "style_reference.png"
 5. Verifica que tenga: detalle histórico, materiales realistas, colores tierra, sin elementos futuristas
+6. Verifica que sea UNA SOLA imagen del personaje, NO un character sheet
 
 ### Step 2: Usar Style Reference
 - **Leonardo.ai**: Sube style_reference.png como "Image Guidance" con modo "Style Reference"
@@ -215,9 +236,9 @@ Si quieres máxima consistencia:
 4. Resultado: 95%+ consistencia de estilo
 
 **Modelos recomendados para LoRA**:
-- Leonardo Diffusion XL (base para entrenar)
+- Leonardo Diffusion XL (base para entrenar) - MEJOR para este estilo
 - Stable Diffusion XL (excelente para realismo histórico)
-- Midjourney v6 (si puedes pagar, mejor calidad)
+- NO usar: Lifelike, Vision XL, PhotoXL, Anime XL
 
 **Costo**: ~$5-10 USD para entrenamiento
 **Tiempo**: 2-4 horas de entrenamiento
@@ -257,5 +278,5 @@ Cuando agregues personajes legendarios, mantén el mismo style guide pero agrega
 
 Ejemplo para Gilgamesh:
 ```
-Gilgamesh, legendary Sumerian king, wearing ornate golden armor with lion motifs, holding divine weapon, majestic beard, crown of horns, heroic imposing stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate ancient Mesopotamian costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, full body character centered on white background, front-facing pose, professional concept art quality, historical reference book illustration, high detail, legendary hero aura, iconic historical appearance
+Gilgamesh, legendary Sumerian king, wearing ornate golden armor with lion motifs, holding divine weapon, majestic beard, crown of horns, heroic imposing stance, classic animation illustration style, Studio Ghibli aesthetic, detailed historical accuracy, period-accurate ancient Mesopotamian costumes, hand-painted texture, warm natural lighting, rich earth tones, realistic proportions, detailed fabric textures, weathered materials, single character standing pose, full body centered on plain white background, front-facing view, single complete illustration, legendary hero aura, iconic historical appearance
 ```
