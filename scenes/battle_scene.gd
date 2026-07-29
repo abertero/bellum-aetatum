@@ -10,6 +10,7 @@ const ENEMY_SPAWN_INTERVAL: float = 3.0
 var _stage_definition: StageDefinition
 var _spawn_system: SpawnSystem
 var _formation_system: FormationSystem
+var _targeting_system: TargetingSystem
 var _combat_system: CombatSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
@@ -21,6 +22,7 @@ func _ready() -> void:
 	_setup_battlefield()
 	_setup_spawn_system()
 	_setup_formation_system()
+	_setup_targeting_system()
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
@@ -85,6 +87,12 @@ func _setup_formation_system() -> void:
 	add_child(_formation_system)
 
 
+func _setup_targeting_system() -> void:
+	_targeting_system = TargetingSystem.new()
+	_targeting_system.initialize(_formation_system)
+	add_child(_targeting_system)
+
+
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
 	_combat_system.initialize(_formation_system)
@@ -124,11 +132,22 @@ func _create_card_buttons() -> void:
 func _create_card_button(card_def: UnitDefinition) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(CARD_BUTTON_WIDTH, CARD_BUTTON_HEIGHT)
-
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
 	panel.add_child(vbox)
+	vbox.add_child(_create_card_image(card_def))
+	vbox.add_child(_create_label(card_def.name))
+	vbox.add_child(_create_label("Cost: %d" % card_def.cost))
+	var click_button := Button.new()
+	click_button.flat = true
+	click_button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	click_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	panel.add_child(click_button)
+	click_button.pressed.connect(_on_card_pressed.bind(card_def))
+	return panel
 
+
+func _create_card_image(card_def: UnitDefinition) -> TextureRect:
 	var image := TextureRect.new()
 	image.custom_minimum_size = Vector2(64, 64)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -138,28 +157,15 @@ func _create_card_button(card_def: UnitDefinition) -> PanelContainer:
 		image.texture = load(image_path)
 	else:
 		image.texture = _create_placeholder(Vector2(64, 64), Color(0.3, 0.3, 0.5))
-	vbox.add_child(image)
+	return image
 
-	var name_label := Label.new()
-	name_label.text = card_def.name
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 10)
-	vbox.add_child(name_label)
 
-	var cost_label := Label.new()
-	cost_label.text = "Cost: %d" % card_def.cost
-	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cost_label.add_theme_font_size_override("font_size", 10)
-	vbox.add_child(cost_label)
-
-	var click_button := Button.new()
-	click_button.flat = true
-	click_button.set_anchors_preset(Control.PRESET_FULL_RECT)
-	click_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	panel.add_child(click_button)
-	click_button.pressed.connect(_on_card_pressed.bind(card_def))
-
-	return panel
+func _create_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
+	return label
 
 
 func _on_card_pressed(card_def: UnitDefinition) -> void:

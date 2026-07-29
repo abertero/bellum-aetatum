@@ -27,50 +27,29 @@ func _cleanup_timers() -> void:
 
 
 func _process_group(group: BattleGroup, delta: float) -> void:
-	group.cleanup()
-
-	var allied_frontline: UnitInstance = group.get_frontline_allied()
-	var enemy_frontline: UnitInstance = group.get_frontline_enemy()
-
-	var combat_active: bool = false
-	if allied_frontline != null and enemy_frontline != null:
-		if allied_frontline.is_melee() and enemy_frontline.is_melee():
-			combat_active = true
-
-	if not combat_active:
-		_reset_non_combat_units(group)
-		return
-
-	_process_melee_units(group.allied_units, enemy_frontline, delta)
-	_process_melee_units(group.enemy_units, allied_frontline, delta)
-
-
-func _reset_non_combat_units(group: BattleGroup) -> void:
-	for unit in group.allied_units:
-		if is_instance_valid(unit) and unit.is_alive():
-			unit.set_blocked()
-	for unit in group.enemy_units:
-		if is_instance_valid(unit) and unit.is_alive():
-			unit.set_blocked()
-
-
-func _process_melee_units(units: Array[UnitInstance], target: UnitInstance, delta: float) -> void:
-	for unit in units:
+	for unit in group.get_all_units():
 		if not is_instance_valid(unit) or not unit.is_alive():
 			continue
-		if not unit.is_melee():
-			continue
+		_process_unit_combat(unit, delta)
+
+
+func _process_unit_combat(unit: UnitInstance, delta: float) -> void:
+	if not unit.is_melee():
+		unit.set_blocked()
+		return
+	var target: UnitInstance = unit.get_current_target()
+	if target != null and target.is_alive():
 		unit.set_attacking()
 		_update_attack_timer(unit, target, delta)
+	else:
+		unit.set_blocked()
 
 
 func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: float) -> void:
 	if not _attack_timers.has(attacker):
 		_attack_timers[attacker] = 0.0
-
 	_attack_timers[attacker] += delta
 	var interval: float = 1.0 / attacker.definition.attack_speed
-
 	if _attack_timers[attacker] >= interval:
 		_attack_timers[attacker] = 0.0
 		_apply_damage(attacker, target)
@@ -79,13 +58,8 @@ func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: f
 func _apply_damage(attacker: UnitInstance, target: UnitInstance) -> void:
 	if not is_instance_valid(target) or not target.is_alive():
 		return
-	var damage: int = attacker.definition.attack
-	target.take_damage(damage)
+	target.take_damage(attacker.definition.attack)
 
 
 func _on_unit_died(unit: UnitInstance) -> void:
 	_attack_timers.erase(unit)
-	var group: BattleGroup = unit.battle_group
-	if group != null:
-		group.remove_unit(unit)
-	unit.queue_free()

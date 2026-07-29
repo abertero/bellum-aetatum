@@ -2,80 +2,84 @@ class_name BattleGroup
 extends RefCounted
 
 var frontline_position: Vector2 = Vector2.ZERO
-var allied_team: String = ""
-var enemy_team: String = ""
-var allied_units: Array[UnitInstance] = []
-var enemy_units: Array[UnitInstance] = []
+var player_formation: Array[UnitInstance] = []
+var enemy_formation: Array[UnitInstance] = []
 
 
 func _init(position: Vector2) -> void:
 	frontline_position = position
 
 
-func add_allied_unit(unit: UnitInstance) -> void:
-	if unit not in allied_units:
-		allied_units.append(unit)
+func add_player_unit(unit: UnitInstance) -> void:
+	if unit not in player_formation:
+		player_formation.append(unit)
 
 
 func add_enemy_unit(unit: UnitInstance) -> void:
-	if unit not in enemy_units:
-		enemy_units.append(unit)
+	if unit not in enemy_formation:
+		enemy_formation.append(unit)
 
 
-func has_allied_unit(unit: UnitInstance) -> bool:
-	return unit in allied_units
+func has_player_unit(unit: UnitInstance) -> bool:
+	return unit in player_formation
 
 
 func has_enemy_unit(unit: UnitInstance) -> bool:
-	return unit in enemy_units
-
-
-func get_allied_count() -> int:
-	return allied_units.size()
-
-
-func get_enemy_count() -> int:
-	return enemy_units.size()
+	return unit in enemy_formation
 
 
 func remove_unit(unit: UnitInstance) -> void:
-	allied_units.erase(unit)
-	enemy_units.erase(unit)
+	player_formation.erase(unit)
+	enemy_formation.erase(unit)
 
 
-func get_frontline_allied() -> UnitInstance:
-	for unit in allied_units:
+func get_frontline(team: String) -> UnitInstance:
+	var formation: Array[UnitInstance] = _get_formation(team)
+	for unit in formation:
 		if is_instance_valid(unit) and unit.is_alive():
 			return unit
 	return null
 
 
-func get_frontline_enemy() -> UnitInstance:
-	for unit in enemy_units:
-		if is_instance_valid(unit) and unit.is_alive():
-			return unit
+func get_next_target(for_unit: UnitInstance) -> UnitInstance:
+	if has_player_unit(for_unit):
+		return get_frontline("enemy")
+	if has_enemy_unit(for_unit):
+		return get_frontline("player")
 	return null
 
 
-func has_frontline_melee_allied() -> bool:
-	var frontline: UnitInstance = get_frontline_allied()
-	return frontline != null and frontline.is_melee()
-
-
-func has_frontline_melee_enemy() -> bool:
-	var frontline: UnitInstance = get_frontline_enemy()
-	return frontline != null and frontline.is_melee()
+func get_all_units() -> Array[UnitInstance]:
+	var units: Array[UnitInstance] = []
+	for unit in player_formation:
+		if is_instance_valid(unit):
+			units.append(unit)
+	for unit in enemy_formation:
+		if is_instance_valid(unit):
+			units.append(unit)
+	return units
 
 
 func cleanup() -> void:
-	var valid_allied: Array[UnitInstance] = []
-	for unit in allied_units:
-		if is_instance_valid(unit) and unit.is_alive():
-			valid_allied.append(unit)
-	allied_units = valid_allied
+	player_formation = _filter_valid(player_formation)
+	enemy_formation = _filter_valid(enemy_formation)
 
-	var valid_enemy: Array[UnitInstance] = []
-	for unit in enemy_units:
+
+func is_empty() -> bool:
+	return player_formation.is_empty() and enemy_formation.is_empty()
+
+
+func _get_formation(team: String) -> Array[UnitInstance]:
+	if team == "player":
+		return player_formation
+	if team == "enemy":
+		return enemy_formation
+	return []
+
+
+func _filter_valid(formation: Array[UnitInstance]) -> Array[UnitInstance]:
+	var valid: Array[UnitInstance] = []
+	for unit in formation:
 		if is_instance_valid(unit) and unit.is_alive():
-			valid_enemy.append(unit)
-	enemy_units = valid_enemy
+			valid.append(unit)
+	return valid

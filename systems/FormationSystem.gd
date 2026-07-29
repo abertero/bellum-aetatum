@@ -14,10 +14,32 @@ func initialize(formation_spacing: float) -> void:
 
 func _ready() -> void:
 	EventBus.unit_spawned.connect(_on_unit_spawned)
+	EventBus.unit_died.connect(_on_unit_died)
 
 
 func _on_unit_spawned(unit: UnitInstance) -> void:
 	register_unit(unit)
+
+
+func _on_unit_died(unit: UnitInstance) -> void:
+	var group: BattleGroup = unit.battle_group
+	if group != null:
+		var was_frontline: bool = _was_frontline(unit, group)
+		group.remove_unit(unit)
+		group.cleanup()
+		if was_frontline:
+			EventBus.frontline_changed.emit(group)
+	unit.queue_free()
+
+
+func _was_frontline(unit: UnitInstance, group: BattleGroup) -> bool:
+	var formation: Array[UnitInstance] = group.player_formation if unit.unit_owner == "player" else group.enemy_formation
+	for candidate in formation:
+		if candidate == unit:
+			return true
+		if is_instance_valid(candidate) and candidate.is_alive():
+			return false
+	return false
 
 
 func get_battle_groups() -> Array[BattleGroup]:
@@ -78,23 +100,19 @@ func _create_or_join_battle_group(unit_a: UnitInstance, unit_b: UnitInstance) ->
 
 func _find_existing_group(unit_a: UnitInstance, unit_b: UnitInstance) -> BattleGroup:
 	for group in _battle_groups:
-		if group.has_allied_unit(unit_a) or group.has_enemy_unit(unit_a):
+		if group.has_player_unit(unit_a) or group.has_enemy_unit(unit_a):
 			return group
-		if group.has_allied_unit(unit_b) or group.has_enemy_unit(unit_b):
+		if group.has_player_unit(unit_b) or group.has_enemy_unit(unit_b):
 			return group
 	return null
 
 
 func _add_units_to_group(unit_a: UnitInstance, unit_b: UnitInstance, group: BattleGroup) -> void:
 	if unit_a.unit_owner == "player":
-		group.allied_team = "player"
-		group.enemy_team = "enemy"
-		group.add_allied_unit(unit_a)
+		group.add_player_unit(unit_a)
 		group.add_enemy_unit(unit_b)
 	else:
-		group.allied_team = "enemy"
-		group.enemy_team = "player"
-		group.add_allied_unit(unit_b)
+		group.add_player_unit(unit_b)
 		group.add_enemy_unit(unit_a)
 
 	unit_a.set_battle_group(group)
@@ -106,27 +124,23 @@ func _add_units_to_group(unit_a: UnitInstance, unit_b: UnitInstance, group: Batt
 
 func _update_formations() -> void:
 	for group in _battle_groups:
-		for unit in group.allied_units:
-			if is_instance_valid(unit) and unit.current_state == UnitState.State.MOVING:
-				_position_unit_in_formation(unit, group)
-
-		for unit in group.enemy_units:
+		for unit in group.get_all_units():
 			if is_instance_valid(unit) and unit.current_state == UnitState.State.MOVING:
 				_position_unit_in_formation(unit, group)
 
 
 func _position_unit_in_formation(unit: UnitInstance, group: BattleGroup) -> void:
-	var index: int = 0
-	var is_allied: bool = group.has_allied_unit(unit)
-	var units_array: Array[UnitInstance] = group.allied_units if is_allied else group.enemy_units
+	var is_player: bool = group.has_player_unit(unit)
+	var formation: Array[UnitInstance] = group.player_formation if is_player else group.enemy_formation
 
-	for i in range(units_array.size()):
-		if units_array[i] == unit:
+	var index: int = 0
+	for i in range(formation.size()):
+		if formation[i] == unit:
 			index = i
 			break
 
 	var offset: float = index * _formation_spacing
-	var direction_multiplier: float = 1.0 if is_allied else -1.0
+	var direction_multiplier: float = 1.0 if is_player else -1.0
 
 	var target_position: Vector2 = group.frontline_position
 	target_position.x += direction_multiplier * offset
