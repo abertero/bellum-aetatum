@@ -1,11 +1,11 @@
-class_name FormationManager
+class_name FormationSystem
 extends Node
 
 const COLLISION_DISTANCE: float = 40.0
 
 var _battle_groups: Array[BattleGroup] = []
 var _formation_spacing: float = 32.0
-var _all_units: Array[Unit] = []
+var _all_units: Array[UnitInstance] = []
 
 
 func initialize(formation_spacing: float) -> void:
@@ -16,7 +16,7 @@ func _ready() -> void:
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 
 
-func _on_unit_spawned(unit: Unit) -> void:
+func _on_unit_spawned(unit: UnitInstance) -> void:
 	register_unit(unit)
 
 
@@ -24,7 +24,7 @@ func get_battle_groups() -> Array[BattleGroup]:
 	return _battle_groups
 
 
-func register_unit(unit: Unit) -> void:
+func register_unit(unit: UnitInstance) -> void:
 	if unit not in _all_units:
 		_all_units.append(unit)
 
@@ -36,7 +36,7 @@ func _physics_process(_delta: float) -> void:
 
 
 func _cleanup_invalid_units() -> void:
-	var valid_units: Array[Unit] = []
+	var valid_units: Array[UnitInstance] = []
 	for unit in _all_units:
 		if is_instance_valid(unit) and unit.is_alive():
 			valid_units.append(unit)
@@ -45,12 +45,12 @@ func _cleanup_invalid_units() -> void:
 
 func _detect_collisions() -> void:
 	for i in range(_all_units.size()):
-		var unit_a: Unit = _all_units[i]
+		var unit_a: UnitInstance = _all_units[i]
 		if not is_instance_valid(unit_a) or unit_a.current_state != UnitState.State.MOVING:
 			continue
 
 		for j in range(i + 1, _all_units.size()):
-			var unit_b: Unit = _all_units[j]
+			var unit_b: UnitInstance = _all_units[j]
 			if not is_instance_valid(unit_b) or unit_b.current_state != UnitState.State.MOVING:
 				continue
 
@@ -60,11 +60,11 @@ func _detect_collisions() -> void:
 					_create_or_join_battle_group(unit_a, unit_b)
 
 
-func _are_opposing(unit_a: Unit, unit_b: Unit) -> bool:
+func _are_opposing(unit_a: UnitInstance, unit_b: UnitInstance) -> bool:
 	return unit_a.unit_owner != unit_b.unit_owner
 
 
-func _create_or_join_battle_group(unit_a: Unit, unit_b: Unit) -> void:
+func _create_or_join_battle_group(unit_a: UnitInstance, unit_b: UnitInstance) -> void:
 	var group: BattleGroup = _find_existing_group(unit_a, unit_b)
 
 	if group == null:
@@ -76,7 +76,7 @@ func _create_or_join_battle_group(unit_a: Unit, unit_b: Unit) -> void:
 	_add_units_to_group(unit_a, unit_b, group)
 
 
-func _find_existing_group(unit_a: Unit, unit_b: Unit) -> BattleGroup:
+func _find_existing_group(unit_a: UnitInstance, unit_b: UnitInstance) -> BattleGroup:
 	for group in _battle_groups:
 		if group.has_allied_unit(unit_a) or group.has_enemy_unit(unit_a):
 			return group
@@ -85,7 +85,7 @@ func _find_existing_group(unit_a: Unit, unit_b: Unit) -> BattleGroup:
 	return null
 
 
-func _add_units_to_group(unit_a: Unit, unit_b: Unit, group: BattleGroup) -> void:
+func _add_units_to_group(unit_a: UnitInstance, unit_b: UnitInstance, group: BattleGroup) -> void:
 	if unit_a.unit_owner == "player":
 		group.allied_team = "player"
 		group.enemy_team = "enemy"
@@ -115,10 +115,10 @@ func _update_formations() -> void:
 				_position_unit_in_formation(unit, group)
 
 
-func _position_unit_in_formation(unit: Unit, group: BattleGroup) -> void:
+func _position_unit_in_formation(unit: UnitInstance, group: BattleGroup) -> void:
 	var index: int = 0
 	var is_allied: bool = group.has_allied_unit(unit)
-	var units_array: Array[Unit] = group.allied_units if is_allied else group.enemy_units
+	var units_array: Array[UnitInstance] = group.allied_units if is_allied else group.enemy_units
 
 	for i in range(units_array.size()):
 		if units_array[i] == unit:

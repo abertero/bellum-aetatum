@@ -16,9 +16,9 @@ config/features=PackedStringArray("4.4")
 
 [autoload]
 
-JsonLoader="*res://autoload/json_loader.gd"
-DeckManager="*res://autoload/deck_manager.gd"
-EventBus="*res://autoload/event_bus.gd"
+JsonLoader="*res://core/JsonLoader.gd"
+DeckSystem="*res://systems/DeckSystem.gd"
+EventBus="*res://core/EventBus.gd"
 
 [rendering]
 

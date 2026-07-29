@@ -1,4 +1,4 @@
-class_name Unit
+class_name UnitInstance
 extends Node2D
 
 const UNIT_WIDTH: float = 64.0
@@ -6,14 +6,13 @@ const UNIT_HEIGHT: float = 80.0
 const IMAGE_HEIGHT: float = 64.0
 const HP_BAR_HEIGHT: float = 6.0
 
-var definition: Dictionary
-var stats: UnitStats
+var definition: UnitDefinition
 var current_hp: int = 0
 var unit_owner: String = "player"
 var battle_group: BattleGroup = null
 var current_state: int = UnitState.State.MOVING
 var attack_cooldown: float = 0.0
-var current_target: Unit = null
+var current_target: UnitInstance = null
 var active_effects: Array = []
 
 var _direction: Vector2 = Vector2.ZERO
@@ -30,11 +29,10 @@ func _ready() -> void:
 	_build_visual()
 
 
-func initialize(card_data: Dictionary, p_owner: String = "player") -> void:
-	definition = card_data
+func initialize(card_definition: UnitDefinition, p_owner: String = "player") -> void:
+	definition = card_definition
 	unit_owner = p_owner
-	stats = definition.get("stats", UnitStats.new())
-	current_hp = stats.hp
+	current_hp = definition.hp
 	_apply_data()
 	_update_state_label()
 	_update_hp_display()
@@ -72,7 +70,7 @@ func is_alive() -> bool:
 
 
 func is_melee() -> bool:
-	return stats.range <= 1
+	return definition.range <= 1
 
 
 func take_damage(amount: int) -> void:
@@ -135,7 +133,7 @@ func _process_dead() -> void:
 
 func _move_toward(target: Vector2, delta: float) -> void:
 	var direction: Vector2 = (target - position).normalized()
-	position += direction * stats.speed * delta
+	position += direction * definition.speed * delta
 
 
 func _check_arrival() -> void:
@@ -149,7 +147,7 @@ func _debug_position() -> void:
 	if Engine.is_editor_hint():
 		return
 	if int(position.x) % 100 == 0:
-		print("Unit %s position: %v" % [definition.get("name", ""), position])
+		print("Unit %s position: %v" % [definition.name, position])
 
 
 func _set_state(new_state: int) -> void:
@@ -170,9 +168,9 @@ func _update_hp_display() -> void:
 
 
 func _update_hp_bar() -> void:
-	if _hp_bar_fill == null or stats == null or stats.hp <= 0:
+	if _hp_bar_fill == null or definition == null or definition.hp <= 0:
 		return
-	var ratio: float = float(current_hp) / float(stats.hp)
+	var ratio: float = float(current_hp) / float(definition.hp)
 	ratio = clamp(ratio, 0.0, 1.0)
 	_hp_bar_fill.size.x = UNIT_WIDTH * ratio
 	if ratio > 0.5:
@@ -185,7 +183,7 @@ func _update_hp_bar() -> void:
 
 func _update_hp_label() -> void:
 	if _hp_label:
-		_hp_label.text = "%d/%d" % [current_hp, stats.hp]
+		_hp_label.text = "%d/%d" % [current_hp, definition.hp]
 
 
 func _build_visual() -> void:
@@ -248,14 +246,14 @@ func _build_visual() -> void:
 
 
 func _apply_data() -> void:
-	if definition.is_empty():
+	if definition == null:
 		return
 
 	var label: Label = get_node("UnitName")
-	label.text = definition.get("name", "")
+	label.text = definition.name
 
 	var image: TextureRect = get_node("UnitImage")
-	var image_path: String = definition.get("image", "")
+	var image_path: String = definition.image
 	if image_path != "" and ResourceLoader.exists(image_path):
 		image.texture = load(image_path)
 	else:
