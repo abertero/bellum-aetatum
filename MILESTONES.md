@@ -536,4 +536,149 @@ Unit._physics_process()
 - `Unit` can support attack animations and combat states.
 - `formation_spacing` can be made dynamic based on unit types.
 
+---
+
+## Milestone 5 — Battlefield Targeting & Formation
+
+### Objective
+
+Introduce battlefield targeting and ordered battle formations. Units now automatically acquire targets through a dedicated targeting system, and battle groups maintain deterministic formations where the next unit advances when the frontline dies.
+
+### What Was Implemented
+
+#### 1. TargetingSystem
+
+- New dedicated system responsible for determining valid targets.
+- Reads battle group formations and assigns targets to melee units.
+- Emits `target_changed` through EventBus whenever a unit receives a different target.
+- CombatSystem now reads `current_target` only — it never searches for targets.
+
+#### 2. Ordered Battle Formations
+
+- BattleGroup refactored to maintain two ordered formations: `player_formation` and `enemy_formation`.
+- Formation order is deterministic and preserved.
+- Exposes `get_frontline(team)` which returns the first alive unit in formation order.
+- Exposes `get_next_target(unit)` which returns the opposing frontline.
+- When a frontline unit dies, the next unit immediately becomes the new frontline.
+
+#### 3. Unit Death & Frontline Advancement
+
+- FormationSystem now handles unit death cleanup (moved from CombatSystem).
+- When a unit dies, FormationSystem removes it from the battle group and emits `frontline_changed` if it was the frontline.
+- TargetingSystem detects the change on the next frame and assigns the new frontline as target.
+
+#### 4. Visual Debug Enhancements
+
+- Each unit now displays three pieces of information above the sprite:
+  - **Current Target** (cyan label)
+  - **Current State** (yellow label)
+  - **Current HP** (white label + health bar)
+- Target display updates automatically when `current_target` changes.
+- Extracted visual logic into `UnitVisualComponent` to maintain SRP and keep UnitInstance under 250 lines.
+
+#### 5. Safe Target References
+
+- `current_target` changed to `Variant` type to safely handle freed object references.
+- Added `get_current_target()` method for safe typed access.
+- `_validate_target()` clears freed references before they cause type errors.
+- Prevents crashes when targets are destroyed between frames.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `systems/TargetingSystem.gd` | 35 | Assigns targets to melee units via BattleGroup; emits `target_changed` |
+| `entities/UnitVisualComponent.gd` | 138 | Extracted visual building/updating from UnitInstance (SRP) |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +1 signal | Added `target_changed` signal for target updates |
+| `entities/BattleGroup.gd` | Rewritten | Ordered formations, `get_frontline()`, `get_next_target()`, `get_all_units()` |
+| `systems/CombatSystem.gd` | -26 lines | Reads only `current_target`; no longer searches for targets |
+| `systems/FormationSystem.gd` | +14 lines | Uses new BattleGroup API; handles unit death + `frontline_changed` emission |
+| `entities/UnitInstance.gd` | +8 lines | Delegates visuals to UnitVisualComponent; safe target validation |
+| `scenes/battle_scene.gd` | +12 lines | Wires up TargetingSystem between FormationSystem and CombatSystem |
+
+### Targeting Flow
+
+```
+FormationSystem detects collision -> creates BattleGroup with ordered formations
+TargetingSystem reads formations -> assigns current_target -> emits target_changed
+UnitInstance._validate_target() -> clears freed references
+CombatSystem reads get_current_target() -> applies damage on timer
+Unit dies -> FormationSystem removes from formation -> emits frontline_changed
+TargetingSystem next frame -> assigns new frontline as target
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **TargetingSystem**: Only responsible for target assignment. No damage calculation, no formation management.
+- **CombatSystem**: Only applies damage based on `current_target`. Never searches for targets.
+- **FormationSystem**: Manages formations and unit death cleanup. Emits `frontline_changed`.
+- **BattleGroup**: Maintains ordered formations. Provides target lookup. Never calculates damage.
+- **UnitVisualComponent**: Handles all visual building and updates. Separated from UnitInstance logic.
+
+#### Open/Closed Principle
+
+- New targeting rules can be added to TargetingSystem without modifying CombatSystem.
+- New formation patterns can be added to BattleGroup without changing UnitInstance.
+- Visual components can be extended without modifying core unit logic.
+
+#### Dependency Inversion
+
+- CombatSystem depends on `get_current_target()` abstraction, not on BattleGroup search logic.
+- TargetingSystem depends on BattleGroup's `get_next_target()`, not on direct unit access.
+- UnitInstance depends on UnitVisualComponent for visuals, not on inline visual code.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each system has one clear purpose (targeting, combat, formation, visuals) |
+| Open/Closed | New targeting rules, formations, and visuals can be added without modifying existing code |
+| Liskov Substitution | Units can be replaced with different implementations without breaking systems |
+| Interface Segregation | Units expose only necessary methods (get_current_target, is_alive, is_melee) |
+| Dependency Inversion | Systems depend on abstractions (get_current_target), not on concrete search logic |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All classes under 205 lines after refactoring |
+| Functions under 30 lines | All functions are 1-15 lines |
+| No static methods | All methods are instance methods |
+| Single responsibility per class | Each class has one clear purpose |
+| Reusable scripts | TargetingSystem and UnitVisualComponent work with any unit configuration |
+| No hardcoded game values | Targeting rules come from BattleGroup formation order |
+| Composition over inheritance | UnitVisualComponent composed into UnitInstance |
+| Dependencies point inward | CombatSystem -> TargetingSystem -> FormationSystem -> BattleGroup |
+
+### What Was NOT Implemented (Intentionally)
+
+- Ranged attacks
+- Projectiles
+- AOE mechanics
+- Abilities / passives
+- Status effects
+- Legendary mechanics
+- Economy / deck editing
+- Victory conditions
+- Audio / animations
+- Menus / settings
+- Save system
+- Localization
+
+### Extension Points for Future Milestones
+
+- `TargetingSystem` can support ranged targeting rules (nearest, lowest HP, etc.).
+- `BattleGroup` can support multiple formation types (line, column, wedge).
+- `UnitInstance` can support target switching animations.
+- `TargetingSystem` can support priority-based targeting for different unit types.
+- `UnitVisualComponent` can support damage numbers, status icons, and attack indicators.
+- `CombatSystem` can support different damage types and resistances.
+
 
