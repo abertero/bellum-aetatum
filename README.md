@@ -21,7 +21,8 @@ res://
     scenes/              # Scene files (.tscn)
     core/                # Core systems (EventBus, UnitState, JsonLoader)
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
-    systems/             # Game systems (CombatSystem, FormationSystem, TargetingSystem, SpawnSystem, DeckSystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
+    models/              # Attack models (AttackModel, MeleeAttackModel, DamageResult)
     definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition)
     factories/           # Object factories (UnitFactory)
     data/
@@ -49,7 +50,16 @@ res://
 | `SpawnSystem` | RefCounted | Instantiates UnitInstance scenes from card data |
 | `FormationSystem` | Node | Detects collisions, manages battle groups and formations |
 | `TargetingSystem` | Node | Assigns targets to melee units via battle groups |
-| `CombatSystem` | Node | Applies damage based on current_target |
+| `AttackSystem` | RefCounted | Executes attacks via AttackModel, emits attack events |
+| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult |
+
+### Attack Models
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `AttackModel` | RefCounted | Base class for attack model abstraction |
+| `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition |
+| `DamageResult` | RefCounted | Data carrier for attack results (damage, source, target, critical, blocked) |
 
 ### Entities
 
@@ -63,7 +73,7 @@ res://
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost) |
+| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model) |
 | `StageDefinition` | RefCounted | Stores stage configuration (battlefield, spawn positions) |
 | `DeckDefinition` | RefCounted | Stores deck card IDs |
 
@@ -76,7 +86,8 @@ BattleScene
   -> SpawnSystem (spawns units via UnitFactory)
   -> FormationSystem (detects collisions, manages formations)
   -> TargetingSystem (assigns targets from formations)
-  -> CombatSystem (reads current_target, applies damage)
+  -> CombatSystem (orchestrates timing, delegates to AttackSystem)
+  -> AttackSystem (executes attacks via AttackModel, emits events)
   -> UnitInstance (displays visuals via UnitVisualComponent)
 
 EventBus (decoupled communication)
@@ -85,6 +96,8 @@ EventBus (decoupled communication)
   - unit_died
   - frontline_changed
   - target_changed
+  - attack_started
+  - attack_finished
 ```
 
 ## Architecture Rules
@@ -102,11 +115,11 @@ EventBus (decoupled communication)
 
 ## SOLID Principles
 
-- **Single Responsibility:** Each class has one reason to change. JsonLoader only reads files. DeckSystem only resolves decks. TargetingSystem only assigns targets. CombatSystem only applies damage.
-- **Open/Closed:** New cards are added via JSON, not code. New stages require only a new JSON file. New targeting rules can be added to TargetingSystem without modifying CombatSystem.
-- **Liskov Substitution:** UnitInstance can be extended without breaking the SpawnSystem contract. BattleGroup can be extended without breaking FormationSystem.
-- **Interface Segregation:** Classes depend only on the data they consume. CombatSystem only reads current_target. TargetingSystem only reads formation order.
-- **Dependency Inversion:** BattleScene depends on abstractions (JsonLoader, DeckSystem, SpawnSystem, FormationSystem, TargetingSystem, CombatSystem), not on concrete data or scenes.
+- **Single Responsibility:** Each class has one reason to change. JsonLoader only reads files. DeckSystem only resolves decks. TargetingSystem only assigns targets. AttackSystem only executes attacks. CombatSystem orchestrates timing and applies damage.
+- **Open/Closed:** New cards are added via JSON, not code. New stages require only a new JSON file. New targeting rules can be added to TargetingSystem without modifying CombatSystem. New attack models extend AttackModel without modifying existing systems.
+- **Liskov Substitution:** UnitInstance can be extended without breaking the SpawnSystem contract. BattleGroup can be extended without breaking FormationSystem. Any AttackModel subclass can replace MeleeAttackModel.
+- **Interface Segregation:** Classes depend only on the data they consume. CombatSystem only reads DamageResult. TargetingSystem only reads formation order.
+- **Dependency Inversion:** BattleScene depends on abstractions (JsonLoader, DeckSystem, SpawnSystem, FormationSystem, TargetingSystem, AttackSystem, CombatSystem), not on concrete data or scenes.
 
 ## Running the Project
 
@@ -123,3 +136,4 @@ See `MILESTONES.md` for detailed documentation of each milestone.
 - [x] Milestone 3 — UnitStats refactoring
 - [x] Milestone 4 — Formation and collision system
 - [x] Milestone 5 — Battlefield targeting & formation
+- [x] Milestone 6 — Attack execution architecture
