@@ -11,6 +11,7 @@ var _stage_definition: StageDefinition
 var _spawn_system: SpawnSystem
 var _formation_system: FormationSystem
 var _targeting_system: TargetingSystem
+var _attack_system: AttackSystem
 var _combat_system: CombatSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
@@ -23,6 +24,7 @@ func _ready() -> void:
 	_setup_spawn_system()
 	_setup_formation_system()
 	_setup_targeting_system()
+	_setup_attack_system()
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
@@ -93,9 +95,13 @@ func _setup_targeting_system() -> void:
 	add_child(_targeting_system)
 
 
+func _setup_attack_system() -> void:
+	_attack_system = AttackSystem.new()
+
+
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
-	_combat_system.initialize(_formation_system)
+	_combat_system.initialize(_formation_system, _attack_system)
 	add_child(_combat_system)
 
 

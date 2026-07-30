@@ -65,7 +65,7 @@ func is_alive() -> bool:
 
 
 func is_melee() -> bool:
-	return definition.range <= 1
+	return definition.attack_model == "melee"
 
 
 func take_damage(amount: int) -> void:

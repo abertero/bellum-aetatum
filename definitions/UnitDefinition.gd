@@ -10,6 +10,7 @@ var range: int = 0
 var speed: float = 0.0
 var cost: int = 0
 var attack_speed: float = 1.0
+var attack_model: String = ""
 
 
 static func from_dictionary(data: Dictionary) -> UnitDefinition:
@@ -24,4 +25,5 @@ static func from_dictionary(data: Dictionary) -> UnitDefinition:
 	definition.speed = float(stats_data.get("speed", 0.0))
 	definition.cost = int(stats_data.get("cost", 0))
 	definition.attack_speed = float(stats_data.get("attack_speed", 1.0))
+	definition.attack_model = str(stats_data.get("attack_model", ""))
 	return definition

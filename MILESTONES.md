@@ -681,4 +681,171 @@ TargetingSystem next frame -> assigns new frontline as target
 - `UnitVisualComponent` can support damage numbers, status icons, and attack indicators.
 - `CombatSystem` can support different damage types and resistances.
 
+---
+
+## Milestone 6 — Attack Execution Architecture
+
+### Objective
+
+Introduce the attack execution architecture by extracting attack logic from CombatSystem into a dedicated AttackSystem with a polymorphic attack model abstraction. Gameplay remains identical — only melee attacks continue working.
+
+### What Was Implemented
+
+#### 1. AttackSystem
+
+- New dedicated system responsible for executing attacks.
+- Receives attacker and target, returns a DamageResult.
+- Delegates damage calculation to the appropriate AttackModel based on `UnitDefinition.attack_model`.
+- Emits `attack_started` and `attack_finished` via EventBus.
+- Stateless — implemented as RefCounted.
+- Does NOT search targets, spawn units, move units, or modify UI.
+
+#### 2. Attack Model Abstraction
+
+- New `AttackModel` base class (RefCounted) with virtual `execute(attacker, target) -> DamageResult`.
+- New `MeleeAttackModel` extends AttackModel — calculates melee damage from `attacker.definition.attack`.
+- Future attack models (ranged, AOE, etc.) can be added by extending AttackModel and registering in AttackSystem.
+
+#### 3. DamageResult
+
+- New lightweight data carrier (RefCounted).
+- Fields: `damage`, `source`, `target`, `critical`, `blocked`.
+- Only `damage` is used in this milestone. Other fields reserved for future milestones.
+
+#### 4. UnitDefinition Extension
+
+- Added `attack_model: String` field to UnitDefinition.
+- Parsed from `stats.attack_model` in card JSON.
+- Combat behavior now depends on this field instead of hardcoded range checks.
+
+#### 5. CombatSystem Refactoring
+
+- CombatSystem no longer performs attacks directly.
+- Calls `AttackSystem.execute(attacker, target)` to obtain a DamageResult.
+- Applies DamageResult via `target.take_damage(result.damage)`.
+- CombatSystem remains the only system allowed to modify HP.
+
+#### 6. UnitInstance Update
+
+- `is_melee()` now checks `definition.attack_model == "melee"` instead of `definition.range <= 1`.
+- No other changes to UnitInstance.
+
+#### 7. EventBus Signals
+
+- Added `attack_started(attacker, target)` signal.
+- Added `attack_finished(attacker, target, result)` signal.
+
+#### 8. Data Updates
+
+- All cards in `cards.json` now include `attack_model` in their stats.
+- Melee units (range 1): `"attack_model": "melee"`.
+- Ranged units (range > 1): `"attack_model": "none"`.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `models/DamageResult.gd` | 8 | Lightweight damage result data carrier |
+| `models/AttackModel.gd` | 7 | Base class for attack model abstraction |
+| `models/MeleeAttackModel.gd` | 10 | Melee attack damage calculation |
+| `systems/AttackSystem.gd` | 22 | Executes attacks via AttackModel, emits events |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `definitions/UnitDefinition.gd` | +2 lines | Added `attack_model` field and parsing |
+| `entities/UnitInstance.gd` | ~1 line | `is_melee()` uses `attack_model` instead of range |
+| `systems/CombatSystem.gd` | +5/-4 lines | Delegates to AttackSystem, applies DamageResult |
+| `core/EventBus.gd` | +2 signals | Added `attack_started`, `attack_finished` |
+| `scenes/battle_scene.gd` | +5 lines | Wires up AttackSystem between targeting and combat |
+| `data/cards/cards.json` | +16 lines | Added `attack_model` to all card stats |
+
+### Attack Flow
+
+```
+CombatSystem._update_attack_timer()
+  -> timer expires
+  -> AttackSystem.execute(attacker, target)
+     -> EventBus.attack_started.emit(attacker, target)
+     -> _resolve_damage(attacker, target)
+        -> lookup attacker.definition.attack_model ("melee")
+        -> MeleeAttackModel.execute(attacker, target)
+           -> DamageResult { damage: attacker.definition.attack, source, target }
+     -> EventBus.attack_finished.emit(attacker, target, result)
+  -> CombatSystem._apply_damage_result(result)
+     -> target.take_damage(result.damage)
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **AttackSystem**: Only executes attacks and emits events. No timers, no target search, no HP modification.
+- **AttackModel / MeleeAttackModel**: Only calculates damage values. No state, no side effects.
+- **DamageResult**: Pure data carrier. No behavior.
+- **CombatSystem**: Orchestrates combat timing and applies damage to HP. Delegates attack execution.
+- **UnitDefinition**: Owns the `attack_model` field that determines combat behavior.
+
+#### Open/Closed Principle
+
+- New attack models (ranged, AOE, magic) can be added by:
+  1. Creating a new class extending AttackModel
+  2. Registering it in AttackSystem._init()
+  3. Setting `attack_model` in card JSON
+- No changes needed in CombatSystem, UnitInstance, or any existing code.
+
+#### Dependency Inversion
+
+- CombatSystem depends on AttackSystem abstraction, not on damage calculation details.
+- AttackSystem depends on AttackModel abstraction, not on concrete MeleeAttackModel.
+- Adding new attack types requires no changes to consumers.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | AttackSystem executes, CombatSystem orchestrates, AttackModel calculates, DamageResult carries data |
+| Open/Closed | New attack models added without modifying existing systems |
+| Liskov Substitution | Any AttackModel subclass can replace MeleeAttackModel |
+| Interface Segregation | AttackModel exposes only `execute()`, DamageResult exposes only data fields |
+| Dependency Inversion | CombatSystem -> AttackSystem -> AttackModel abstraction chain |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | Largest new file is 22 lines (AttackSystem) |
+| Functions under 30 lines | All functions are 1-7 lines |
+| No static methods | All methods are instance methods |
+| Composition over inheritance | AttackSystem composed of AttackModel instances via dictionary |
+| No duplicated logic | Damage calculation lives only in MeleeAttackModel |
+| Dependencies point inward | CombatSystem -> AttackSystem -> AttackModel -> DamageResult |
+
+### What Was NOT Implemented (Intentionally)
+
+- Ranged attacks
+- Projectiles
+- AOE mechanics
+- Abilities / passives
+- Critical hits (field exists in DamageResult but unused)
+- Healing
+- Status effects
+- Block mechanics (field exists in DamageResult but unused)
+- Animations / particles
+- Economy / deck editing
+- Victory conditions
+- Audio
+- Menus / settings
+- Save system
+- Localization
+
+### Extension Points for Future Milestones
+
+- `AttackModel` can be extended with RangedAttackModel, AOEAttackModel, MagicAttackModel.
+- `DamageResult.critical` can be used for critical hit mechanics.
+- `DamageResult.blocked` can be used for block/dodge mechanics.
+- `AttackSystem._models` dictionary can be populated dynamically for mod support.
+- `UnitDefinition.attack_model` can support any string value for new attack types.
+
 

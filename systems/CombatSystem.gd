@@ -2,11 +2,13 @@ class_name CombatSystem
 extends Node
 
 var _formation_system: FormationSystem
+var _attack_system: AttackSystem
 var _attack_timers: Dictionary
 
 
-func initialize(formation_system: FormationSystem) -> void:
+func initialize(formation_system: FormationSystem, attack_system: AttackSystem) -> void:
 	_formation_system = formation_system
+	_attack_system = attack_system
 	_attack_timers = {}
 	EventBus.unit_died.connect(_on_unit_died)
 
@@ -52,13 +54,16 @@ func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: f
 	var interval: float = 1.0 / attacker.definition.attack_speed
 	if _attack_timers[attacker] >= interval:
 		_attack_timers[attacker] = 0.0
-		_apply_damage(attacker, target)
+		var result: DamageResult = _attack_system.execute(attacker, target)
+		_apply_damage_result(result)
 
 
-func _apply_damage(attacker: UnitInstance, target: UnitInstance) -> void:
-	if not is_instance_valid(target) or not target.is_alive():
+func _apply_damage_result(result: DamageResult) -> void:
+	if result.target == null or not is_instance_valid(result.target):
 		return
-	target.take_damage(attacker.definition.attack)
+	if not result.target.is_alive():
+		return
+	result.target.take_damage(result.damage)
 
 
 func _on_unit_died(unit: UnitInstance) -> void:
