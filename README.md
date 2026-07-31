@@ -14,15 +14,15 @@ Everything in the game should be configurable without changing source code. The 
 - **Language:** GDScript (typed)
 - **Data Format:** JSON
 
-## Project Structure
+## Folder Structure
 
 ```
 res://
-    scenes/              # Scene files (.tscn)
-    core/                # Core systems (EventBus, UnitState, JsonLoader)
+    scenes/              # Scene files (.tscn) and scene scripts
+    core/                # Autoload singletons and core utilities
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
     systems/             # Game systems (CombatSystem, FormationSystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
-    models/              # Attack models (AttackModel, MeleeAttackModel, DamageResult)
+    models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry, DamageResult)
     definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition)
     factories/           # Object factories (UnitFactory)
     data/
@@ -31,74 +31,161 @@ res://
         stages/          # Stage configurations (stage_001.json)
     assets/
         cards/           # Card artwork (future)
+    docs/
+        adr/             # Architecture Decision Records
 ```
 
-## Architecture
+## Architectural Layers
 
-### Core Systems (Autoload)
+The architecture follows a layered design with strict dependency direction: outer layers depend on inner layers, never the reverse.
+
+```
+scenes/ -> systems/ -> models/ -> definitions/
+                     -> entities/ -> definitions/
+                     -> core/
+```
+
+### Core
+
+Autoloaded singletons available globally.
 
 | Class | Responsibility |
 |---|---|
-| `JsonLoader` | Reads and parses JSON files |
-| `DeckSystem` | Loads card database and builds decks |
-| `EventBus` | Global signal bus for decoupled communication |
+| `JsonLoader` | Reads and parses JSON files. No game logic. |
+| `DeckSystem` | Loads card database and builds decks from JSON. |
+| `EventBus` | Global signal bus for decoupled communication between systems. |
+| `UnitState` | Enum and string conversion for unit states. |
 
-### Game Systems
+### Systems
 
-| Class | Type | Responsibility |
-|---|---|---|
-| `SpawnSystem` | RefCounted | Instantiates UnitInstance scenes from card data |
-| `FormationSystem` | Node | Detects collisions, manages battle groups and formations |
-| `TargetingSystem` | Node | Assigns targets to melee units via battle groups |
-| `AttackSystem` | RefCounted | Executes attacks via AttackModel, emits attack events |
-| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult |
-
-### Attack Models
+Game logic systems that orchestrate behavior.
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `AttackModel` | RefCounted | Base class for attack model abstraction |
-| `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition |
-| `DamageResult` | RefCounted | Data carrier for attack results (damage, source, target, critical, blocked) |
+| `SpawnSystem` | RefCounted | Instantiates UnitInstance scenes via UnitFactory. |
+| `FormationSystem` | Node | Detects collisions, manages battle groups and formations. |
+| `TargetingSystem` | Node | Assigns targets to melee units via battle groups. |
+| `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Emits attack events. |
+| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. |
+| `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
+
+### Models
+
+Attack model abstraction and registry.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `AttackModel` | RefCounted | Abstract base class defining the attack execution contract. |
+| `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition. |
+| `AttackModelRegistry` | RefCounted | Registers and resolves attack models by identifier. |
+| `DamageResult` | RefCounted | Data carrier for attack results (damage, source, target, critical, blocked). |
 
 ### Entities
 
-| Class | Type | Responsibility |
-|---|---|---|
-| `UnitInstance` | Node2D | Represents one spawned unit on the battlefield |
-| `BattleGroup` | RefCounted | Maintains ordered player/enemy formations |
-| `UnitVisualComponent` | Node | Handles visual building and updates (HP bar, labels) |
-
-### Data Definitions
+Runtime game objects.
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model) |
-| `StageDefinition` | RefCounted | Stores stage configuration (battlefield, spawn positions) |
-| `DeckDefinition` | RefCounted | Stores deck card IDs |
+| `UnitInstance` | Node2D | Represents one spawned unit on the battlefield. Owns state, movement, and HP. |
+| `BattleGroup` | RefCounted | Maintains ordered player/enemy formations. Provides frontline lookup. |
+| `UnitVisualComponent` | Node | Handles visual building and updates (HP bar, labels, target display). |
 
-### Communication Flow
+### Definitions
+
+Pure data containers parsed from JSON.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model). |
+| `StageDefinition` | RefCounted | Stores stage configuration (battlefield, spawn positions, formation spacing). |
+| `DeckDefinition` | RefCounted | Stores deck card IDs. |
+
+### Factories
+
+Object creation.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `UnitFactory` | RefCounted | Creates UnitInstance from PackedScene and initializes with definition. |
+
+## EventBus
+
+All systems communicate through `EventBus` signals, avoiding direct coupling.
+
+| Signal | Emitter | Listeners |
+|---|---|---|
+| `battle_started` | BattleScene | (future) |
+| `battle_ended` | (future) | (future) |
+| `unit_spawned(unit)` | SpawnSystem | FormationSystem |
+| `unit_moved(unit)` | (future) | (future) |
+| `unit_damaged(unit, damage)` | UnitInstance | (future) |
+| `unit_died(unit)` | UnitInstance | FormationSystem, CombatSystem |
+| `frontline_changed(group)` | FormationSystem | (future) |
+| `target_changed(unit, target)` | TargetingSystem | (future) |
+| `attack_started(attacker, target)` | AttackSystem | (future) |
+| `attack_finished(attacker, target, result)` | AttackSystem | (future) |
+
+## Gameplay Flow
 
 ```
-BattleScene
-  -> JsonLoader (reads JSON)
-  -> DeckSystem (loads decks via JsonLoader)
-  -> SpawnSystem (spawns units via UnitFactory)
-  -> FormationSystem (detects collisions, manages formations)
-  -> TargetingSystem (assigns targets from formations)
-  -> CombatSystem (orchestrates timing, delegates to AttackSystem)
-  -> AttackSystem (executes attacks via AttackModel, emits events)
-  -> UnitInstance (displays visuals via UnitVisualComponent)
+BattleScene._ready()
+  -> Load stage from JSON
+  -> Setup systems (SpawnSystem, FormationSystem, TargetingSystem, AttackSystem, CombatSystem)
+  -> Load decks from JSON
+  -> Create card button UI
 
-EventBus (decoupled communication)
-  - unit_spawned
-  - unit_damaged
-  - unit_died
-  - frontline_changed
-  - target_changed
-  - attack_started
-  - attack_finished
+Player clicks card button
+  -> SpawnSystem.spawn_unit()
+     -> UnitFactory.create_unit()
+     -> UnitInstance.configure_movement()
+     -> EventBus.unit_spawned emitted
+
+FormationSystem._physics_process()
+  -> Detect collisions between opposing units
+  -> Create BattleGroup at collision point
+  -> Position units in formation
+
+TargetingSystem._physics_process()
+  -> Read battle group formations
+  -> Assign frontline as target to melee units
+  -> EventBus.target_changed emitted
+
+CombatSystem._physics_process()
+  -> Check attack timers
+  -> AttackSystem.execute(attacker, target)
+     -> AttackModelRegistry.resolve(attack_model)
+     -> MeleeAttackModel.execute() -> DamageResult
+     -> EventBus.attack_started / attack_finished emitted
+  -> Apply DamageResult via target.take_damage()
+
+Unit dies
+  -> EventBus.unit_died emitted
+  -> FormationSystem removes from formation
+  -> TargetingSystem assigns new frontline next frame
 ```
+
+## Milestones
+
+### Completed
+
+- [x] **Milestone 1** - Architecture validation: data-driven loading, unit spawning, stage configuration
+- [x] **Milestone 2** - Unit movement: automatic movement from base to base, framerate independent
+- [x] **Milestone 3** - UnitStats refactoring: dedicated stats class, centralized parsing
+- [x] **Milestone 4** - Formation and collision: unit collision detection, battle groups, formation positioning
+- [x] **Milestone 5** - Battlefield targeting: TargetingSystem, ordered formations, frontline advancement
+- [x] **Milestone 6** - Attack execution architecture: AttackSystem, AttackModel abstraction, AttackModelRegistry
+
+### Planned
+
+- [ ] **Milestone 7** - Ranged attacks: RangedAttackModel, range-based targeting
+- [ ] **Milestone 8** - Projectiles: projectile entities, travel time, visual feedback
+- [ ] **Milestone 9** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 10** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 11** - Victory conditions: base destruction, win/lose detection
+- [ ] **Milestone 12** - Economy: gold, card costs, deck building
+- [ ] **Milestone 13** - Animations and visual effects
+- [ ] **Milestone 14** - Audio: sound effects, music
+- [ ] **Milestone 15** - Menus, settings, save system
 
 ## Architecture Rules
 
@@ -115,25 +202,14 @@ EventBus (decoupled communication)
 
 ## SOLID Principles
 
-- **Single Responsibility:** Each class has one reason to change. JsonLoader only reads files. DeckSystem only resolves decks. TargetingSystem only assigns targets. AttackSystem only executes attacks. CombatSystem orchestrates timing and applies damage.
-- **Open/Closed:** New cards are added via JSON, not code. New stages require only a new JSON file. New targeting rules can be added to TargetingSystem without modifying CombatSystem. New attack models extend AttackModel without modifying existing systems.
-- **Liskov Substitution:** UnitInstance can be extended without breaking the SpawnSystem contract. BattleGroup can be extended without breaking FormationSystem. Any AttackModel subclass can replace MeleeAttackModel.
-- **Interface Segregation:** Classes depend only on the data they consume. CombatSystem only reads DamageResult. TargetingSystem only reads formation order.
-- **Dependency Inversion:** BattleScene depends on abstractions (JsonLoader, DeckSystem, SpawnSystem, FormationSystem, TargetingSystem, AttackSystem, CombatSystem), not on concrete data or scenes.
+- **Single Responsibility:** Each class has one reason to change.
+- **Open/Closed:** New cards via JSON. New attack models via AttackModel + registry.
+- **Liskov Substitution:** Any AttackModel subclass can replace MeleeAttackModel.
+- **Interface Segregation:** Classes depend only on the data they consume.
+- **Dependency Inversion:** Systems depend on abstractions, not concrete implementations.
 
 ## Running the Project
 
 1. Open Godot 4.4.
 2. Import the project from this directory.
 3. Run the main scene (`scenes/battle_scene.tscn`).
-
-## Milestones
-
-See `MILESTONES.md` for detailed documentation of each milestone.
-
-- [x] Milestone 1 — Architecture validation
-- [x] Milestone 2 — Unit movement
-- [x] Milestone 3 — UnitStats refactoring
-- [x] Milestone 4 — Formation and collision system
-- [x] Milestone 5 — Battlefield targeting & formation
-- [x] Milestone 6 — Attack execution architecture

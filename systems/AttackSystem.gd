@@ -1,11 +1,11 @@
 class_name AttackSystem
 extends RefCounted
 
-var _models: Dictionary = {}
+var _registry: AttackModelRegistry
 
 
-func _init() -> void:
-	_models["melee"] = MeleeAttackModel.new()
+func _init(registry: AttackModelRegistry) -> void:
+	_registry = registry
 
 
 func execute(attacker: UnitInstance, target: UnitInstance) -> DamageResult:
@@ -17,7 +17,7 @@ func execute(attacker: UnitInstance, target: UnitInstance) -> DamageResult:
 
 func _resolve_damage(attacker: UnitInstance, target: UnitInstance) -> DamageResult:
 	var model_key: String = attacker.definition.attack_model
-	if not _models.has(model_key):
+	var model: AttackModel = _registry.resolve(model_key)
+	if model == null:
 		return DamageResult.new()
-	var model: AttackModel = _models[model_key]
 	return model.execute(attacker, target)

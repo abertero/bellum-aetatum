@@ -687,7 +687,7 @@ TargetingSystem next frame -> assigns new frontline as target
 
 ### Objective
 
-Introduce the attack execution architecture by extracting attack logic from CombatSystem into a dedicated AttackSystem with a polymorphic attack model abstraction. Gameplay remains identical — only melee attacks continue working.
+Introduce the attack execution architecture by extracting attack logic from CombatSystem into a dedicated AttackSystem with a polymorphic attack model abstraction and a registry for model resolution. Gameplay remains identical — only melee attacks continue working.
 
 ### What Was Implemented
 
@@ -695,47 +695,55 @@ Introduce the attack execution architecture by extracting attack logic from Comb
 
 - New dedicated system responsible for executing attacks.
 - Receives attacker and target, returns a DamageResult.
-- Delegates damage calculation to the appropriate AttackModel based on `UnitDefinition.attack_model`.
+- Delegates damage calculation to the appropriate AttackModel via AttackModelRegistry.
 - Emits `attack_started` and `attack_finished` via EventBus.
 - Stateless — implemented as RefCounted.
+- Does NOT know concrete attack classes. Depends only on AttackModelRegistry.
 - Does NOT search targets, spawn units, move units, or modify UI.
 
 #### 2. Attack Model Abstraction
 
 - New `AttackModel` base class (RefCounted) with virtual `execute(attacker, target) -> DamageResult`.
 - New `MeleeAttackModel` extends AttackModel — calculates melee damage from `attacker.definition.attack`.
-- Future attack models (ranged, AOE, etc.) can be added by extending AttackModel and registering in AttackSystem.
+- Future attack models (ranged, AOE, etc.) can be added by extending AttackModel and registering in the registry.
 
-#### 3. DamageResult
+#### 3. AttackModelRegistry
+
+- New `AttackModelRegistry` class (RefCounted) responsible for registering and resolving attack models by string identifier.
+- Provides `register(model_key, model)` and `resolve(model_key) -> AttackModel`.
+- AttackSystem receives the registry through its constructor.
+- Registration happens externally in BattleScene, not inside AttackSystem.
+
+#### 4. DamageResult
 
 - New lightweight data carrier (RefCounted).
 - Fields: `damage`, `source`, `target`, `critical`, `blocked`.
 - Only `damage` is used in this milestone. Other fields reserved for future milestones.
 
-#### 4. UnitDefinition Extension
+#### 5. UnitDefinition Extension
 
 - Added `attack_model: String` field to UnitDefinition.
 - Parsed from `stats.attack_model` in card JSON.
 - Combat behavior now depends on this field instead of hardcoded range checks.
 
-#### 5. CombatSystem Refactoring
+#### 6. CombatSystem Refactoring
 
 - CombatSystem no longer performs attacks directly.
 - Calls `AttackSystem.execute(attacker, target)` to obtain a DamageResult.
 - Applies DamageResult via `target.take_damage(result.damage)`.
 - CombatSystem remains the only system allowed to modify HP.
 
-#### 6. UnitInstance Update
+#### 7. UnitInstance Update
 
 - `is_melee()` now checks `definition.attack_model == "melee"` instead of `definition.range <= 1`.
 - No other changes to UnitInstance.
 
-#### 7. EventBus Signals
+#### 8. EventBus Signals
 
 - Added `attack_started(attacker, target)` signal.
 - Added `attack_finished(attacker, target, result)` signal.
 
-#### 8. Data Updates
+#### 9. Data Updates
 
 - All cards in `cards.json` now include `attack_model` in their stats.
 - Melee units (range 1): `"attack_model": "melee"`.
@@ -746,9 +754,10 @@ Introduce the attack execution architecture by extracting attack logic from Comb
 | File | Lines | Purpose |
 |---|---|---|
 | `models/DamageResult.gd` | 8 | Lightweight damage result data carrier |
-| `models/AttackModel.gd` | 7 | Base class for attack model abstraction |
+| `models/AttackModel.gd` | 6 | Base class for attack model abstraction |
 | `models/MeleeAttackModel.gd` | 10 | Melee attack damage calculation |
-| `systems/AttackSystem.gd` | 22 | Executes attacks via AttackModel, emits events |
+| `models/AttackModelRegistry.gd` | 12 | Registers and resolves attack models by identifier |
+| `systems/AttackSystem.gd` | 23 | Executes attacks via AttackModelRegistry, emits events |
 
 ### Files Modified
 
@@ -758,7 +767,7 @@ Introduce the attack execution architecture by extracting attack logic from Comb
 | `entities/UnitInstance.gd` | ~1 line | `is_melee()` uses `attack_model` instead of range |
 | `systems/CombatSystem.gd` | +5/-4 lines | Delegates to AttackSystem, applies DamageResult |
 | `core/EventBus.gd` | +2 signals | Added `attack_started`, `attack_finished` |
-| `scenes/battle_scene.gd` | +5 lines | Wires up AttackSystem between targeting and combat |
+| `scenes/battle_scene.gd` | +5 lines | Creates AttackModelRegistry, registers models, wires AttackSystem |
 | `data/cards/cards.json` | +16 lines | Added `attack_model` to all card stats |
 
 ### Attack Flow
@@ -769,7 +778,8 @@ CombatSystem._update_attack_timer()
   -> AttackSystem.execute(attacker, target)
      -> EventBus.attack_started.emit(attacker, target)
      -> _resolve_damage(attacker, target)
-        -> lookup attacker.definition.attack_model ("melee")
+        -> model_key = attacker.definition.attack_model ("melee")
+        -> AttackModelRegistry.resolve(model_key) -> MeleeAttackModel
         -> MeleeAttackModel.execute(attacker, target)
            -> DamageResult { damage: attacker.definition.attack, source, target }
      -> EventBus.attack_finished.emit(attacker, target, result)
@@ -781,7 +791,8 @@ CombatSystem._update_attack_timer()
 
 #### Single Responsibility Principle
 
-- **AttackSystem**: Only executes attacks and emits events. No timers, no target search, no HP modification.
+- **AttackSystem**: Only executes attacks and emits events. No timers, no target search, no HP modification. Does not know concrete attack classes.
+- **AttackModelRegistry**: Only registers and resolves attack models. No attack logic.
 - **AttackModel / MeleeAttackModel**: Only calculates damage values. No state, no side effects.
 - **DamageResult**: Pure data carrier. No behavior.
 - **CombatSystem**: Orchestrates combat timing and applies damage to HP. Delegates attack execution.
@@ -791,36 +802,37 @@ CombatSystem._update_attack_timer()
 
 - New attack models (ranged, AOE, magic) can be added by:
   1. Creating a new class extending AttackModel
-  2. Registering it in AttackSystem._init()
+  2. Registering it in BattleScene via AttackModelRegistry
   3. Setting `attack_model` in card JSON
-- No changes needed in CombatSystem, UnitInstance, or any existing code.
+- No changes needed in AttackSystem, CombatSystem, UnitInstance, or any existing code.
 
 #### Dependency Inversion
 
 - CombatSystem depends on AttackSystem abstraction, not on damage calculation details.
-- AttackSystem depends on AttackModel abstraction, not on concrete MeleeAttackModel.
+- AttackSystem depends on AttackModelRegistry, not on concrete attack classes.
+- AttackModelRegistry depends on AttackModel abstraction, not on concrete implementations.
 - Adding new attack types requires no changes to consumers.
 
 ### SOLID Compliance
 
 | Principle | How |
 |---|---|
-| Single Responsibility | AttackSystem executes, CombatSystem orchestrates, AttackModel calculates, DamageResult carries data |
-| Open/Closed | New attack models added without modifying existing systems |
+| Single Responsibility | AttackSystem executes, AttackModelRegistry resolves, AttackModel calculates, DamageResult carries data |
+| Open/Closed | New attack models added by extending AttackModel and registering in registry |
 | Liskov Substitution | Any AttackModel subclass can replace MeleeAttackModel |
 | Interface Segregation | AttackModel exposes only `execute()`, DamageResult exposes only data fields |
-| Dependency Inversion | CombatSystem -> AttackSystem -> AttackModel abstraction chain |
+| Dependency Inversion | CombatSystem -> AttackSystem -> AttackModelRegistry -> AttackModel abstraction chain |
 
 ### Architecture Rules Applied
 
 | Rule | How |
 |---|---|
-| Classes under 250 lines | Largest new file is 22 lines (AttackSystem) |
+| Classes under 250 lines | Largest new file is 23 lines (AttackSystem) |
 | Functions under 30 lines | All functions are 1-7 lines |
 | No static methods | All methods are instance methods |
-| Composition over inheritance | AttackSystem composed of AttackModel instances via dictionary |
+| Composition over inheritance | AttackSystem composed with AttackModelRegistry; registry composed of AttackModel instances |
 | No duplicated logic | Damage calculation lives only in MeleeAttackModel |
-| Dependencies point inward | CombatSystem -> AttackSystem -> AttackModel -> DamageResult |
+| Dependencies point inward | CombatSystem -> AttackSystem -> AttackModelRegistry -> AttackModel -> DamageResult |
 
 ### What Was NOT Implemented (Intentionally)
 
@@ -843,9 +855,9 @@ CombatSystem._update_attack_timer()
 ### Extension Points for Future Milestones
 
 - `AttackModel` can be extended with RangedAttackModel, AOEAttackModel, MagicAttackModel.
+- `AttackModelRegistry` can register new models without modifying AttackSystem.
 - `DamageResult.critical` can be used for critical hit mechanics.
 - `DamageResult.blocked` can be used for block/dodge mechanics.
-- `AttackSystem._models` dictionary can be populated dynamically for mod support.
 - `UnitDefinition.attack_model` can support any string value for new attack types.
 
 

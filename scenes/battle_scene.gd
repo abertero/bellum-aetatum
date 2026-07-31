@@ -96,7 +96,9 @@ func _setup_targeting_system() -> void:
 
 
 func _setup_attack_system() -> void:
-	_attack_system = AttackSystem.new()
+	var registry := AttackModelRegistry.new()
+	registry.register("melee", MeleeAttackModel.new())
+	_attack_system = AttackSystem.new(registry)
 
 
 func _setup_combat_system() -> void:
