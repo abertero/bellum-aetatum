@@ -21,7 +21,7 @@ res://
     scenes/              # Scene files (.tscn) and scene scripts
     core/                # Autoload singletons and core utilities
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
-    systems/             # Game systems (CombatSystem, FormationSystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
     models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry, DamageResult)
     definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition)
     factories/           # Object factories (UnitFactory)
@@ -64,9 +64,10 @@ Game logic systems that orchestrate behavior.
 |---|---|---|
 | `SpawnSystem` | RefCounted | Instantiates UnitInstance scenes via UnitFactory. |
 | `FormationSystem` | Node | Detects collisions, manages battle groups and formations. |
-| `TargetingSystem` | Node | Assigns targets to melee units via battle groups. |
+| `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only. |
+| `TargetingSystem` | Node | Assigns targets to melee units via SpatialQuerySystem. |
 | `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Emits attack events. |
-| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. |
+| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. Tracks units via EventBus. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
 
 ### Models
@@ -116,7 +117,7 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 |---|---|---|
 | `battle_started` | BattleScene | (future) |
 | `battle_ended` | (future) | (future) |
-| `unit_spawned(unit)` | SpawnSystem | FormationSystem |
+| `unit_spawned(unit)` | SpawnSystem | FormationSystem, CombatSystem |
 | `unit_moved(unit)` | (future) | (future) |
 | `unit_damaged(unit, damage)` | UnitInstance | (future) |
 | `unit_died(unit)` | UnitInstance | FormationSystem, CombatSystem |
@@ -130,7 +131,7 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 ```
 BattleScene._ready()
   -> Load stage from JSON
-  -> Setup systems (SpawnSystem, FormationSystem, TargetingSystem, AttackSystem, CombatSystem)
+  -> Setup systems (SpawnSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, AttackSystem, CombatSystem)
   -> Load decks from JSON
   -> Create card button UI
 
@@ -146,12 +147,14 @@ FormationSystem._physics_process()
   -> Position units in formation
 
 TargetingSystem._physics_process()
-  -> Read battle group formations
-  -> Assign frontline as target to melee units
+  -> SpatialQuerySystem.get_units_in_formation() for each team
+  -> SpatialQuerySystem.get_frontline() for each melee unit
+  -> Assign frontline as target
   -> EventBus.target_changed emitted
 
 CombatSystem._physics_process()
-  -> Check attack timers
+  -> Track units via EventBus (unit_spawned, unit_died)
+  -> Check attack timers for units with valid targets
   -> AttackSystem.execute(attacker, target)
      -> AttackModelRegistry.resolve(attack_model)
      -> MeleeAttackModel.execute() -> DamageResult
@@ -161,6 +164,7 @@ CombatSystem._physics_process()
 Unit dies
   -> EventBus.unit_died emitted
   -> FormationSystem removes from formation
+  -> CombatSystem removes from tracked units
   -> TargetingSystem assigns new frontline next frame
 ```
 
@@ -173,7 +177,8 @@ Unit dies
 - [x] **Milestone 3** - UnitStats refactoring: dedicated stats class, centralized parsing
 - [x] **Milestone 4** - Formation and collision: unit collision detection, battle groups, formation positioning
 - [x] **Milestone 5** - Battlefield targeting: TargetingSystem, ordered formations, frontline advancement
-- [x] **Milestone 6** - Attack execution architecture: AttackSystem, AttackModel abstraction, AttackModelRegistry
+- [x] **Milestone 5.5** - Attack execution architecture: AttackSystem, AttackModel abstraction, AttackModelRegistry
+- [x] **Milestone 6** - Spatial query architecture: SpatialQuerySystem, decoupled targeting, EventBus-based combat tracking
 
 ### Planned
 

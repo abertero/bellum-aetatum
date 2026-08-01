@@ -13,8 +13,8 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          v              v              v              v
 +------------------------------------------------------------------+
 |                        Systems Layer                              |
-|  SpawnSystem | FormationSystem | TargetingSystem | CombatSystem  |
-|  AttackSystem | DeckSystem                                       |
+|  SpawnSystem | FormationSystem | SpatialQuerySystem              |
+|  TargetingSystem | CombatSystem | AttackSystem | DeckSystem      |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -96,9 +96,10 @@ Game logic systems that orchestrate behavior.
 
 - **SpawnSystem**: Creates UnitInstance via UnitFactory. Emits `unit_spawned`.
 - **FormationSystem**: Detects collisions, creates BattleGroups, manages formation positioning.
-- **TargetingSystem**: Assigns targets to melee units based on BattleGroup formations.
+- **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only — never modifies state.
+- **TargetingSystem**: Assigns targets to melee units based on SpatialQuerySystem queries.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, delegates to AttackSystem, applies DamageResult.
+- **CombatSystem**: Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. Tracks units via EventBus.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 
 ### Factories Layer
@@ -126,13 +127,14 @@ Scenes -> Systems -> Models -> Entities -> Definitions -> Core
 Specifically:
 
 - **BattleScene** depends on all systems, definitions, and core.
-- **CombatSystem** depends on AttackSystem, FormationSystem, EventBus, UnitInstance.
+- **CombatSystem** depends on AttackSystem, EventBus, UnitInstance.
+- **TargetingSystem** depends on SpatialQuerySystem, EventBus, UnitInstance.
+- **SpatialQuerySystem** depends on FormationSystem, BattleGroup, UnitInstance.
 - **AttackSystem** depends on AttackModelRegistry, EventBus, UnitInstance.
 - **AttackModelRegistry** depends on AttackModel.
 - **MeleeAttackModel** depends on AttackModel, UnitInstance, DamageResult.
 - **UnitInstance** depends on UnitDefinition, UnitVisualComponent, EventBus, UnitState.
 - **FormationSystem** depends on BattleGroup, UnitInstance, EventBus, UnitState.
-- **TargetingSystem** depends on FormationSystem, BattleGroup, UnitInstance, EventBus.
 
 ## Communication Through EventBus
 
@@ -141,7 +143,7 @@ Systems avoid direct coupling by communicating through EventBus signals.
 ### Signal Flow
 
 ```
-SpawnSystem          --[unit_spawned]--------> FormationSystem
+SpawnSystem          --[unit_spawned]--------> FormationSystem, CombatSystem
 UnitInstance         --[unit_died]-----------> FormationSystem, CombatSystem
 FormationSystem      --[frontline_changed]---> (future listeners)
 TargetingSystem      --[target_changed]------> (future listeners)
@@ -199,6 +201,7 @@ UnitInstance         --[unit_damaged]--------> (future listeners)
 _physics_process(delta):
   1. BattleScene._physics_process()
      -> _update_enemy_spawn_timer() -> SpawnSystem.spawn_unit()
+     -> _update_debug_panel()
 
   2. FormationSystem._physics_process()
      -> _cleanup_invalid_units()
@@ -206,12 +209,15 @@ _physics_process(delta):
      -> _update_formations()
 
   3. TargetingSystem._physics_process()
-     -> _update_targets_for_group() for each BattleGroup
+     -> _assign_targets_for_team() for each team
+        -> SpatialQuerySystem.get_units_in_formation()
+        -> SpatialQuerySystem.get_frontline()
 
   4. CombatSystem._physics_process()
      -> _cleanup_timers()
-     -> _process_group() for each BattleGroup
-        -> _process_unit_combat() for each alive unit
+     -> _cleanup_tracked_units()
+     -> _process_all_units()
+        -> _process_unit_combat() for each unit with target
            -> _update_attack_timer()
               -> AttackSystem.execute()
                  -> AttackModelRegistry.resolve()

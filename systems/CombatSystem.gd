@@ -1,22 +1,22 @@
 class_name CombatSystem
 extends Node
 
-var _formation_system: FormationSystem
 var _attack_system: AttackSystem
 var _attack_timers: Dictionary
+var _tracked_units: Array[UnitInstance] = []
 
 
-func initialize(formation_system: FormationSystem, attack_system: AttackSystem) -> void:
-	_formation_system = formation_system
+func initialize(attack_system: AttackSystem) -> void:
 	_attack_system = attack_system
 	_attack_timers = {}
+	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
 
 
 func _physics_process(delta: float) -> void:
 	_cleanup_timers()
-	for group in _formation_system.get_battle_groups():
-		_process_group(group, delta)
+	_cleanup_tracked_units()
+	_process_all_units(delta)
 
 
 func _cleanup_timers() -> void:
@@ -28,9 +28,20 @@ func _cleanup_timers() -> void:
 		_attack_timers.erase(key)
 
 
-func _process_group(group: BattleGroup, delta: float) -> void:
-	for unit in group.get_all_units():
+func _cleanup_tracked_units() -> void:
+	var valid: Array[UnitInstance] = []
+	for unit in _tracked_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			valid.append(unit)
+	_tracked_units = valid
+
+
+func _process_all_units(delta: float) -> void:
+	var units: Array[UnitInstance] = _tracked_units.duplicate()
+	for unit in units:
 		if not is_instance_valid(unit) or not unit.is_alive():
+			continue
+		if unit.battle_group == null:
 			continue
 		_process_unit_combat(unit, delta)
 
@@ -66,5 +77,10 @@ func _apply_damage_result(result: DamageResult) -> void:
 	result.target.take_damage(result.damage)
 
 
+func _on_unit_spawned(unit: UnitInstance) -> void:
+	_tracked_units.append(unit)
+
+
 func _on_unit_died(unit: UnitInstance) -> void:
+	_tracked_units.erase(unit)
 	_attack_timers.erase(unit)

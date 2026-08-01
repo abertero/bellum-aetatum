@@ -1,31 +1,24 @@
 class_name TargetingSystem
 extends Node
 
-var _formation_system: FormationSystem
+var _spatial_query: SpatialQuerySystem
 
 
-func initialize(formation_system: FormationSystem) -> void:
-	_formation_system = formation_system
+func initialize(spatial_query: SpatialQuerySystem) -> void:
+	_spatial_query = spatial_query
 
 
 func _physics_process(_delta: float) -> void:
-	for group in _formation_system.get_battle_groups():
-		_update_targets_for_group(group)
+	_assign_targets_for_team("player")
+	_assign_targets_for_team("enemy")
 
 
-func _update_targets_for_group(group: BattleGroup) -> void:
-	_assign_targets_for_team(group, "player")
-	_assign_targets_for_team(group, "enemy")
-
-
-func _assign_targets_for_team(group: BattleGroup, team: String) -> void:
-	var formation: Array[UnitInstance] = group.player_formation if team == "player" else group.enemy_formation
+func _assign_targets_for_team(team: String) -> void:
+	var formation: Array[UnitInstance] = _spatial_query.get_units_in_formation(team)
 	for unit in formation:
-		if not is_instance_valid(unit) or not unit.is_alive():
-			continue
 		if not unit.is_melee():
 			continue
-		var target: UnitInstance = group.get_next_target(unit)
+		var target: UnitInstance = _spatial_query.get_frontline(unit)
 		_assign_target(unit, target)
 
 

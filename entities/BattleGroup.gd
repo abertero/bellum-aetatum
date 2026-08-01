@@ -41,14 +41,6 @@ func get_frontline(team: String) -> UnitInstance:
 	return null
 
 
-func get_next_target(for_unit: UnitInstance) -> UnitInstance:
-	if has_player_unit(for_unit):
-		return get_frontline("enemy")
-	if has_enemy_unit(for_unit):
-		return get_frontline("player")
-	return null
-
-
 func get_all_units() -> Array[UnitInstance]:
 	var units: Array[UnitInstance] = []
 	for unit in player_formation:

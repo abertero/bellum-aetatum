@@ -10,12 +10,14 @@ const ENEMY_SPAWN_INTERVAL: float = 3.0
 var _stage_definition: StageDefinition
 var _spawn_system: SpawnSystem
 var _formation_system: FormationSystem
+var _spatial_query: SpatialQuerySystem
 var _targeting_system: TargetingSystem
 var _attack_system: AttackSystem
 var _combat_system: CombatSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
+var _debug_panel: PanelContainer = null
 
 
 func _ready() -> void:
@@ -23,16 +25,19 @@ func _ready() -> void:
 	_setup_battlefield()
 	_setup_spawn_system()
 	_setup_formation_system()
+	_setup_spatial_query_system()
 	_setup_targeting_system()
 	_setup_attack_system()
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
+	_setup_debug_panel()
 	EventBus.battle_started.emit()
 
 
 func _physics_process(delta: float) -> void:
 	_update_enemy_spawn_timer(delta)
+	_update_debug_panel()
 
 
 func _update_enemy_spawn_timer(delta: float) -> void:
@@ -56,13 +61,11 @@ func _setup_battlefield() -> void:
 	bg.color = Color(0.15, 0.2, 0.12)
 	bg.size = Vector2(float(_stage_definition.battlefield_width), VIEWPORT_HEIGHT)
 	add_child(bg)
-
 	var player_base := ColorRect.new()
 	player_base.color = Color(0.2, 0.4, 0.8)
 	player_base.size = Vector2(BASE_WIDTH, BASE_HEIGHT)
 	player_base.position = Vector2(40.0, (VIEWPORT_HEIGHT - BASE_HEIGHT) / 2.0)
 	add_child(player_base)
-
 	var enemy_base := ColorRect.new()
 	enemy_base.color = Color(0.8, 0.2, 0.2)
 	enemy_base.size = Vector2(BASE_WIDTH, BASE_HEIGHT)
@@ -71,7 +74,6 @@ func _setup_battlefield() -> void:
 		(VIEWPORT_HEIGHT - BASE_HEIGHT) / 2.0
 	)
 	add_child(enemy_base)
-
 	_unit_container = Node2D.new()
 	_unit_container.name = "UnitContainer"
 	add_child(_unit_container)
@@ -89,9 +91,14 @@ func _setup_formation_system() -> void:
 	add_child(_formation_system)
 
 
+func _setup_spatial_query_system() -> void:
+	_spatial_query = SpatialQuerySystem.new()
+	_spatial_query.initialize(_formation_system)
+
+
 func _setup_targeting_system() -> void:
 	_targeting_system = TargetingSystem.new()
-	_targeting_system.initialize(_formation_system)
+	_targeting_system.initialize(_spatial_query)
 	add_child(_targeting_system)
 
 
@@ -103,7 +110,7 @@ func _setup_attack_system() -> void:
 
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
-	_combat_system.initialize(_formation_system, _attack_system)
+	_combat_system.initialize(_attack_system)
 	add_child(_combat_system)
 
 
@@ -211,3 +218,33 @@ func _create_placeholder(size: Vector2, color: Color) -> ImageTexture:
 	var img := Image.create(int(size.x), int(size.y), false, Image.FORMAT_RGBA8)
 	img.fill(color)
 	return ImageTexture.create_from_image(img)
+
+
+func _setup_debug_panel() -> void:
+	_debug_panel = PanelContainer.new()
+	_debug_panel.name = "DebugPanel"
+	_debug_panel.position = Vector2(10.0, 10.0)
+	_debug_panel.custom_minimum_size = Vector2(200.0, 100.0)
+	var cl := CanvasLayer.new()
+	cl.name = "DebugLayer"
+	add_child(cl)
+	cl.add_child(_debug_panel)
+	var label := Label.new()
+	label.name = "DebugLabel"
+	_debug_panel.add_child(label)
+
+
+func _update_debug_panel() -> void:
+	if _debug_panel == null or _spatial_query == null:
+		return
+	var label: Label = _debug_panel.get_node("DebugLabel")
+	var count: int = _spatial_query.get_battle_group_count()
+	var text: String = "BattleGroups: %d\n" % count
+	for i in range(count):
+		var units: Array[UnitInstance] = _spatial_query.get_units_in_group(i)
+		var pf: UnitInstance = _spatial_query.get_group_frontline(i, "player")
+		var ef: UnitInstance = _spatial_query.get_group_frontline(i, "enemy")
+		var pn: String = pf.definition.name if pf != null else "None"
+		var en: String = ef.definition.name if ef != null else "None"
+		text += "Group %d: %d units | P: %s | E: %s\n" % [i, units.size(), pn, en]
+	label.text = text

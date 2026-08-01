@@ -860,4 +860,141 @@ CombatSystem._update_attack_timer()
 - `DamageResult.blocked` can be used for block/dodge mechanics.
 - `UnitDefinition.attack_model` can support any string value for new attack types.
 
+---
+
+## Milestone 6 — Spatial Query Architecture
+
+### Objective
+
+Introduce a reusable `SpatialQuerySystem` that becomes the single point for all battlefield queries. Decouple `TargetingSystem` and `CombatSystem` from direct `BattleGroup` and `FormationSystem` dependencies. Gameplay remains identical.
+
+### What Was Implemented
+
+#### 1. SpatialQuerySystem
+
+- New dedicated system responsible for all battlefield queries.
+- `RefCounted` — stateless query service, no `_physics_process`.
+- Receives `FormationSystem` via `initialize()`.
+- Internally uses `BattleGroup` but does not expose it in gameplay-facing API.
+- Never modifies gameplay state, never moves units, never calculates combat.
+
+#### 2. Supported Queries
+
+| Method | Returns |
+|---|---|
+| `get_frontline(for_unit)` | Frontline unit opposing the given unit within its battle group. |
+| `get_units_in_formation(owner)` | All alive units in formations for the given owner. |
+| `get_units_by_owner(owner)` | All alive units belonging to the given owner. |
+| `get_units_by_state(state)` | All alive units in the given state. |
+| `get_closest_enemy(unit)` | Closest living enemy to the given unit. |
+| `get_battle_group_count()` | Number of active battle groups (debug). |
+| `get_units_in_group(index)` | Units in a specific battle group (debug). |
+| `get_group_frontline(index, team)` | Frontline of a specific group (debug). |
+
+#### 3. TargetingSystem Refactoring
+
+- `TargetingSystem` now depends on `SpatialQuerySystem` instead of `FormationSystem`.
+- No longer accesses `BattleGroup` directly.
+- Uses `get_units_in_formation()` and `get_frontline()` for target assignment.
+- Behavior is identical: same units receive the same targets.
+
+#### 4. CombatSystem Refactoring
+
+- `CombatSystem` no longer depends on `FormationSystem`.
+- Tracks units via `EventBus` signals (`unit_spawned`, `unit_died`).
+- Processes only units in battle groups (`unit.battle_group != null`).
+- Behavior is identical: same units are attacked at the same timing.
+
+#### 5. BattleGroup Cleanup
+
+- `get_next_target()` removed — this was a gameplay rule embedded in a data structure.
+- Equivalent logic moved to `SpatialQuerySystem.get_frontline()`.
+- `BattleGroup` now exposes only low-level formation information.
+
+#### 6. FormationSystem Extension
+
+- Added `get_all_units()` public getter for `SpatialQuerySystem` to query all registered units.
+
+#### 7. Debug Panel
+
+- `BattleScene` creates a debug panel showing battle group count, units per group, and frontlines.
+- Updates every frame via `_update_debug_panel()`.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `systems/SpatialQuerySystem.gd` | 85 | Battlefield query facade over FormationSystem/BattleGroup |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `entities/BattleGroup.gd` | -7 lines | Removed `get_next_target()` (gameplay rule moved to SpatialQuerySystem) |
+| `systems/FormationSystem.gd` | +4 lines | Added `get_all_units()` public getter |
+| `systems/TargetingSystem.gd` | Rewritten | Uses SpatialQuerySystem instead of FormationSystem/BattleGroup |
+| `systems/CombatSystem.gd` | Rewritten | Uses EventBus tracking instead of FormationSystem/BattleGroup |
+| `scenes/battle_scene.gd` | +30 lines | Wires SpatialQuerySystem, updates CombatSystem init, adds debug panel |
+
+### Dependency Changes
+
+```
+Before:
+  TargetingSystem -> FormationSystem -> BattleGroup
+  CombatSystem    -> FormationSystem -> BattleGroup
+
+After:
+  TargetingSystem -> SpatialQuerySystem -> FormationSystem -> BattleGroup
+  CombatSystem    -> EventBus (unit tracking)
+```
+
+### Behavior Verification
+
+- TargetingSystem assigns identical targets: `get_frontline()` resolves through `unit.battle_group` to the same `get_frontline(team)` call.
+- CombatSystem processes identical units: tracks all spawned units, filters by `battle_group != null` and `is_alive()`.
+- Attack timing unchanged: same timer logic, same `AttackSystem.execute()` path.
+- Formation positioning unchanged: FormationSystem logic untouched.
+- Unit movement unchanged: UnitInstance logic untouched.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | SpatialQuerySystem only answers queries. BattleGroup only stores formation data. |
+| Open/Closed | New queries added to SpatialQuerySystem without modifying callers. |
+| Liskov Substitution | SpatialQuerySystem can be replaced with a different implementation. |
+| Interface Segregation | Callers depend only on query methods they use. |
+| Dependency Inversion | TargetingSystem depends on SpatialQuerySystem abstraction, not BattleGroup internals. |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | SpatialQuerySystem is 85 lines |
+| Functions under 30 lines | All functions are 1-12 lines |
+| Composition over inheritance | SpatialQuerySystem composed with FormationSystem reference |
+| No duplicated queries | All queries centralized in SpatialQuerySystem |
+| Dependencies point inward | TargetingSystem -> SpatialQuerySystem -> FormationSystem -> BattleGroup |
+
+### What Was NOT Implemented (Intentionally)
+
+- Ranged attacks
+- Projectiles
+- AOE mechanics
+- Abilities / passives
+- Status effects
+- Economy / deck editing
+- Victory conditions
+- Audio / animations
+- Menus / settings
+- Save system
+
+### Extension Points for Future Milestones
+
+- `SpatialQuerySystem` can add range-based queries for ranged targeting.
+- `SpatialQuerySystem` can add area queries for AOE mechanics.
+- `SpatialQuerySystem` can add priority-based queries for ability targeting.
+- New queries can be added without modifying existing methods or callers.
+- `BattleGroup` internal implementation can be replaced without API changes.
+
 

@@ -46,6 +46,10 @@ func get_battle_groups() -> Array[BattleGroup]:
 	return _battle_groups
 
 
+func get_all_units() -> Array[UnitInstance]:
+	return _all_units
+
+
 func register_unit(unit: UnitInstance) -> void:
 	if unit not in _all_units:
 		_all_units.append(unit)
