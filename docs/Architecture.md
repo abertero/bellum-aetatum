@@ -21,6 +21,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                        Systems Layer                              |
 |  SpawnSystem | FormationSystem | SpatialQuerySystem              |
 |  TargetingSystem | CombatSystem | AttackSystem | DeckSystem      |
+|  EconomySystem                                                    |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -43,14 +44,21 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          |              |
          v              v
 +------------------------------------------------------------------+
+|                      Resources Layer                              |
+|  ResourceInstance                                                 |
++------------------------------------------------------------------+
+         |              |
+         v              v
++------------------------------------------------------------------+
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
+|  ResourceDefinition                                               |
 +------------------------------------------------------------------+
          |
          v
 +------------------------------------------------------------------+
 |                         Core Layer                                |
-|  EventBus | JsonLoader | UnitState                                |
+|  EventBus | JsonLoader | UnitState | SimulationContext            |
 +------------------------------------------------------------------+
          |
          v
@@ -63,6 +71,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                         Data Layer                                |
 |  cards.json | player_deck.json | enemy_deck.json | stage_001.json|
+|  resources.json                                                   |
 +------------------------------------------------------------------+
 ```
 
@@ -70,11 +79,12 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 
 ### Core Layer
 
-Autoloaded singletons providing infrastructure services available globally.
+Autoloaded singletons and infrastructure services available globally.
 
-- **EventBus**: Global signal bus. All inter-system communication flows through EventBus signals. Systems emit and listen to signals without knowing about each other. Broadcasts `GameAction` objects for gameplay operations.
+- **EventBus**: Global signal bus. All inter-system communication flows through EventBus signals. Systems emit and listen to signals without knowing about each other. Broadcasts `GameAction` objects for gameplay operations. Emits resource events (`resource_changed`, `resource_spent`, `resource_generated`).
 - **JsonLoader**: Reads JSON files from disk and returns parsed data. Has no knowledge of game concepts.
 - **UnitState**: Enum defining unit states (MOVING, WAITING, BLOCKED, ATTACKING, DEAD) and string conversion utility.
+- **SimulationContext**: Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides a consistent time source for all systems. Updated by BattleScene in `_physics_process()`. Never queries engine clock directly. Future: will support fixed timestep, replay, time scaling, pause, slow motion, deterministic multiplayer.
 
 ### Definitions Layer
 
@@ -83,6 +93,7 @@ Pure data containers that hold configuration parsed from JSON. No behavior, no m
 - **UnitDefinition**: Unit statistics (hp, attack, range, speed, cost, attack_speed, attack_model).
 - **StageDefinition**: Stage configuration (battlefield_width, spawn positions, formation_spacing).
 - **DeckDefinition**: Deck card ID list.
+- **ResourceDefinition**: Resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from `data/resources/resources.json`.
 
 ### Entities Layer
 
@@ -118,6 +129,12 @@ The `set_moving()` transition ensures units resume advancement when their target
 
 The `release_from_battle_group()` method is called by FormationSystem when a BattleGroup becomes empty of enemies. It clears the battle_group reference, resets movement flags (`_has_reached_target`, `_has_formation_target`), and transitions the unit to MOVING state so it can continue toward its original target position.
 
+### Resources Layer
+
+Runtime resource state for each team.
+
+- **ResourceInstance**: Tracks current value, generator level, and accumulated regeneration for a specific resource type. Handles regeneration logic with fractional accumulation. Emits events on changes.
+
 ### Models Layer
 
 Attack model abstraction and registry.
@@ -140,7 +157,7 @@ Command framework separating player intent from gameplay execution.
 - **GameCommand**: Base class for all commands. Contains `command_id`, `timestamp`, `metadata`. Immutable after creation. Commands are requests, never modify game state.
 - **PlayCardCommand**: Extends `GameCommand` with `card_definition`, `spawn_position`, `target_position`, `parent`, `team`. Created via factory method.
 - **AttackCommand**: Extends `GameCommand` with `attacker`, `target`. Created via factory method.
-- **CommandDispatcher**: Routes commands to responsible systems. Never implements gameplay logic. Translates command data into system method calls.
+- **CommandDispatcher**: Routes commands to responsible systems. Validates commands against EconomySystem before dispatching. Never implements gameplay logic. Translates command data into system method calls.
 
 ### Systems Layer
 
@@ -153,6 +170,7 @@ Game logic systems that orchestrate behavior.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
 - **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
+- **EconomySystem**: Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates.
 
 ### Factories Layer
 

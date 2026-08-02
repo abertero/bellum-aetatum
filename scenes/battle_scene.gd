@@ -8,38 +8,49 @@ const VIEWPORT_HEIGHT: float = 648.0
 const ENEMY_SPAWN_INTERVAL: float = 3.0
 
 var _stage_definition: StageDefinition
+var _simulation_context: SimulationContext
 var _spawn_system: SpawnSystem
 var _formation_system: FormationSystem
 var _spatial_query: SpatialQuerySystem
 var _targeting_system: TargetingSystem
 var _attack_system: AttackSystem
 var _combat_system: CombatSystem
+var _economy_system: EconomySystem
 var _command_dispatcher: CommandDispatcher
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
 var _debug_panel: PanelContainer = null
+var _resource_panel: PanelContainer = null
+var _resource_label: Label = null
+var _card_buttons: Array[PanelContainer] = []
 
 
 func _ready() -> void:
 	_load_stage()
+	_setup_simulation_context()
 	_setup_battlefield()
 	_setup_spawn_system()
 	_setup_formation_system()
 	_setup_spatial_query_system()
 	_setup_targeting_system()
 	_setup_attack_system()
+	_setup_economy_system()
 	_setup_command_dispatcher()
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
 	_setup_debug_panel()
+	_setup_resource_panel()
 	EventBus.battle_started.emit()
 
 
 func _physics_process(delta: float) -> void:
+	_simulation_context.update(delta)
 	_update_enemy_spawn_timer(delta)
 	_update_debug_panel()
+	_update_resource_panel()
+	_update_card_affordability()
 
 
 func _update_enemy_spawn_timer(delta: float) -> void:
@@ -56,6 +67,10 @@ func _load_stage() -> void:
 	else:
 		push_error("BattleScene: using fallback stage data")
 		_stage_definition = StageDefinition.create_fallback()
+
+
+func _setup_simulation_context() -> void:
+	_simulation_context = SimulationContext.new()
 
 
 func _setup_battlefield() -> void:
@@ -110,9 +125,15 @@ func _setup_attack_system() -> void:
 	_attack_system = AttackSystem.new(registry)
 
 
+func _setup_economy_system() -> void:
+	_economy_system = EconomySystem.new()
+	_economy_system.initialize(_simulation_context)
+	add_child(_economy_system)
+
+
 func _setup_command_dispatcher() -> void:
 	_command_dispatcher = CommandDispatcher.new()
-	_command_dispatcher.initialize(_spawn_system, _attack_system)
+	_command_dispatcher.initialize(_spawn_system, _attack_system, _economy_system)
 
 
 func _setup_combat_system() -> void:
@@ -149,6 +170,7 @@ func _create_card_buttons() -> void:
 	for card_def: UnitDefinition in player_deck:
 		var button: PanelContainer = _create_card_button(card_def)
 		hbox.add_child(button)
+		_card_buttons.append(button)
 
 
 func _create_card_button(card_def: UnitDefinition) -> PanelContainer:
@@ -199,8 +221,9 @@ func _on_card_pressed(card_def: UnitDefinition) -> void:
 	var target_position := Vector2(target_pos.x, target_pos.y)
 
 	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "player")
-	_command_dispatcher.dispatch(command)
-	print("BattleScene: spawned %s" % card_def.name)
+	var result: Variant = _command_dispatcher.dispatch(command)
+	if result != null:
+		print("BattleScene: spawned %s" % card_def.name)
 
 
 func _spawn_enemy_unit() -> void:
@@ -209,6 +232,10 @@ func _spawn_enemy_unit() -> void:
 		return
 
 	var card_def: UnitDefinition = enemy_deck[_enemy_deck_index % enemy_deck.size()]
+	
+	if not _economy_system.can_afford("enemy", "imperium", card_def.cost):
+		return
+	
 	_enemy_deck_index += 1
 
 	var spawn_pos: Vector2 = _stage_definition.enemy_spawn_position
@@ -219,8 +246,9 @@ func _spawn_enemy_unit() -> void:
 	var target_position := Vector2(target_pos.x, target_pos.y)
 
 	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "enemy")
-	_command_dispatcher.dispatch(command)
-	print("BattleScene: spawned enemy %s" % card_def.name)
+	var result: Variant = _command_dispatcher.dispatch(command)
+	if result != null:
+		print("BattleScene: spawned enemy %s" % card_def.name)
 
 
 func _create_placeholder(size: Vector2, color: Color) -> ImageTexture:
@@ -257,3 +285,39 @@ func _update_debug_panel() -> void:
 		var en: String = ef.definition.name if ef != null else "None"
 		text += "Group %d: %d units | P: %s | E: %s\n" % [i, units.size(), pn, en]
 	label.text = text
+
+
+func _setup_resource_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_resource_panel = PanelContainer.new()
+	_resource_panel.name = "ResourcePanel"
+	_resource_panel.position = Vector2(220.0, 10.0)
+	_resource_panel.custom_minimum_size = Vector2(150.0, 60.0)
+	canvas_layer.add_child(_resource_panel)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	_resource_panel.add_child(vbox)
+	_resource_label = Label.new()
+	_resource_label.name = "ResourceLabel"
+	_resource_label.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(_resource_label)
+
+
+func _update_resource_panel() -> void:
+	if _resource_label == null or _economy_system == null:
+		return
+	var current: int = _economy_system.get_current("player", "imperium")
+	var maximum: int = _economy_system.get_maximum("player", "imperium")
+	var regen: float = _economy_system.get_regeneration_rate("player", "imperium")
+	_resource_label.text = "Imperium: %d/%d\nRegen: %.1f/s" % [current, maximum, regen]
+
+
+func _update_card_affordability() -> void:
+	if _economy_system == null:
+		return
+	var player_deck: Array[UnitDefinition] = DeckSystem.get_player_deck()
+	for i in range(_card_buttons.size()):
+		var button: PanelContainer = _card_buttons[i]
+		var card_def: UnitDefinition = player_deck[i]
+		var can_afford: bool = _economy_system.can_afford("player", "imperium", card_def.cost)
+		button.modulate = Color(1.0, 1.0, 1.0, 1.0) if can_afford else Color(0.5, 0.5, 0.5, 0.7)

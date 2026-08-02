@@ -1413,4 +1413,241 @@ The fix emerges naturally from the existing architecture:
 
 No hacks or workarounds were introduced. The solution respects the separation of concerns established in previous milestones.
 
+---
+
+## Milestone 9 — Economy Layer
+
+### Objective
+
+Introduce a reusable Economy Layer that manages resources, validates spending, and enforces costs for all gameplay actions. Players must spend resources to play cards. The AI must obey exactly the same rules. No cheating.
+
+### What Was Implemented
+
+#### 1. SimulationContext
+
+- New `SimulationContext` class (`core/SimulationContext.gd`), extends `RefCounted`.
+- Manages simulation time: `delta_time`, `elapsed_time`, `time_scale`, `paused`.
+- Provides consistent time source for all systems.
+- Updated by BattleScene in `_physics_process()`.
+- Never queries engine clock directly.
+- Future: will support fixed timestep, replay, time scaling, pause, slow motion, deterministic multiplayer.
+
+#### 2. ResourceDefinition
+
+- New `ResourceDefinition` class (`definitions/ResourceDefinition.gd`), extends `RefCounted`.
+- Pure data container for resource properties.
+- Fields: `id`, `display_name`, `maximum`, `starting_value`, `regeneration_rate`.
+- Loaded from `data/resources/resources.json`.
+- Immutable after creation.
+
+#### 3. ResourceInstance
+
+- New `ResourceInstance` class (`resources/ResourceInstance.gd`), extends `RefCounted`.
+- Runtime state for a resource.
+- Fields: `definition`, `current_value`, `generator_level`, `_accumulated_regeneration`.
+- Handles regeneration logic with fractional accumulation.
+- Emits events on changes (`resource_changed`, `resource_spent`, `resource_generated`).
+- Provides API: `can_afford()`, `spend()`, `regenerate()`, `get_current()`, `get_maximum()`, `get_regeneration_rate()`.
+
+#### 4. EconomySystem
+
+- New `EconomySystem` class (`systems/EconomySystem.gd`), extends `Node`.
+- Manages resources for all teams (player, enemy).
+- Uses SimulationContext for time-based updates.
+- Loads resource definitions from JSON.
+- Creates resource instances for each team.
+- Provides API: `can_afford()`, `spend()`, `get_current()`, `get_maximum()`, `get_regeneration_rate()`, `set_generator_level()`.
+- Regenerates resources in `_physics_process()`.
+
+#### 5. Command Validation
+
+- `CommandDispatcher` updated to accept `EconomySystem` in `initialize()`.
+- Validates `PlayCardCommand` before dispatching.
+- Calls `_validate_play_card()` to check if player can afford the cost.
+- Calls `_spend_resource()` to deduct the cost if validation passes.
+- Returns null if validation fails (command rejected).
+
+#### 6. EventBus Updates
+
+- Added `resource_changed(resource_id, current_value, maximum)` signal.
+- Added `resource_spent(resource_id, amount, remaining)` signal.
+- Added `resource_generated(resource_id, amount, current_value)` signal.
+
+#### 7. Resource Configuration
+
+- Created `data/resources/resources.json` with Imperium resource definition.
+- Imperium: maximum 20, starting value 5, regeneration rate 1.0/s.
+
+#### 8. Card Costs
+
+- `UnitDefinition` already had `cost` field.
+- All cards in `cards.json` already have cost values (2-5).
+- No changes needed to card data.
+
+#### 9. UI Integration
+
+- Added resource panel displaying current/max Imperium and regeneration rate.
+- Cards are greyed out when player cannot afford them.
+- Visual feedback via `modulate` property.
+- Updates every frame.
+
+#### 10. AI Integration
+
+- AI uses the same EconomySystem as the player.
+- AI checks `can_afford()` before attempting to spawn.
+- AI skips spawn if it cannot afford the card.
+- No cheating: AI must wait for resources to regenerate.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `core/SimulationContext.gd` | 15 | Manages simulation time for all systems |
+| `definitions/ResourceDefinition.gd` | 19 | Pure data container for resource properties |
+| `resources/ResourceInstance.gd` | 47 | Runtime state for a resource |
+| `systems/EconomySystem.gd` | 88 | Manages resources for all teams |
+| `data/resources/resources.json` | 11 | Resource configuration |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +3 signals | Added resource events |
+| `commands/CommandDispatcher.gd` | +15 lines | Added EconomySystem validation |
+| `scenes/battle_scene.gd` | +50 lines | Setup EconomySystem, SimulationContext, UI |
+
+### Command Validation Flow
+
+```
+Player Input / AI
+  ↓
+PlayCardCommand (immutable request)
+  ↓
+CommandDispatcher.dispatch(command)
+  ↓
+_validate_play_card(command)
+  ↓
+EconomySystem.can_afford(team, "imperium", cost)
+  ↓
+If affordable:
+  → _spend_resource(command)
+  → EconomySystem.spend(team, "imperium", cost)
+  → EventBus.resource_spent emitted
+  → SpawnSystem.spawn_unit()
+  → UnitInstance created
+If not affordable:
+  → Return null (command rejected)
+  → No unit spawned
+```
+
+### Resource Regeneration Flow
+
+```
+BattleScene._physics_process(delta)
+  ↓
+SimulationContext.update(delta)
+  → delta_time = delta * time_scale
+  → elapsed_time += delta_time
+  ↓
+EconomySystem._physics_process()
+  → For each team:
+    → For each resource:
+      → ResourceInstance.regenerate(delta_time)
+        → effective_rate = regeneration_rate * generator_level
+        → accumulated_regeneration += effective_rate * delta_time
+        → whole_amount = int(accumulated_regeneration)
+        → If whole_amount > 0:
+          → accumulated_regeneration -= whole_amount
+          → current_value = min(current_value + whole_amount, maximum)
+          → EventBus.resource_generated emitted
+          → EventBus.resource_changed emitted
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **SimulationContext**: Only manages simulation time. No gameplay logic.
+- **ResourceDefinition**: Only stores resource properties. No behavior.
+- **ResourceInstance**: Only manages resource state and regeneration. No spawning, no combat.
+- **EconomySystem**: Only manages resources for all teams. No spawning, no combat, no commands.
+- **CommandDispatcher**: Routes commands and validates them. No resource management logic.
+
+#### Open/Closed Principle
+
+- New resource types can be added to `resources.json` without modifying code.
+- New command types can be validated by extending `CommandDispatcher`.
+- EconomySystem can support new teams without modifying existing code.
+
+#### Dependency Inversion
+
+- Systems depend on `SimulationContext` abstraction, not engine clock.
+- CommandDispatcher depends on `EconomySystem` abstraction, not resource implementation.
+- ResourceInstance depends on `ResourceDefinition` abstraction, not JSON parsing.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | SimulationContext manages time, ResourceDefinition stores data, ResourceInstance manages state, EconomySystem manages resources, CommandDispatcher validates |
+| Open/Closed | New resources added via JSON, new commands validated by extending dispatcher |
+| Liskov Substitution | Any ResourceInstance can be used interchangeably |
+| Interface Segregation | Systems depend only on methods they use |
+| Dependency Inversion | Systems depend on abstractions (SimulationContext, EconomySystem), not implementations |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | SimulationContext is 15 lines, ResourceDefinition is 19 lines, ResourceInstance is 47 lines, EconomySystem is 88 lines |
+| Functions under 30 lines | All functions are 1-12 lines |
+| Composition over inheritance | ResourceInstance composed with ResourceDefinition, EconomySystem composed with SimulationContext |
+| No duplicated logic | Resource regeneration logic centralized in ResourceInstance |
+| Dependencies point inward | Systems → EconomySystem → ResourceInstance → ResourceDefinition → SimulationContext |
+
+### Behavior Changes
+
+- Players cannot spawn units without sufficient resources
+- Resources regenerate over time (1.0/s for Imperium)
+- AI respects same resource limits
+- Cards are greyed out when unaffordable
+- Resource panel shows current/max/regen
+
+### Existing Gameplay Preserved
+
+- Unit spawning works (when affordable)
+- Combat unchanged
+- Formation unchanged
+- Targeting unchanged
+- Death unchanged
+- Movement unchanged
+
+### What Was NOT Implemented (Intentionally)
+
+- Additional resource types (only Imperium)
+- Upgrade UI (generator_level exists but no UI)
+- Resource trading between teams
+- Resource theft/destruction
+- Complex regeneration formulas
+- Economy-based victory conditions
+- Abilities
+- Projectiles
+- Status effects
+- Critical hits
+- Animations / particles
+- Victory conditions
+- Audio
+- Menus / settings
+- Save system
+
+### Extension Points for Future Milestones
+
+- `ResourceDefinition` can be extended with new resource types via JSON.
+- `ResourceInstance` can support complex regeneration formulas.
+- `EconomySystem` can support resource trading, theft, destruction.
+- `generator_level` can be upgraded via UI in future milestone.
+- `SimulationContext` can support fixed timestep, replay, time scaling, pause, slow motion, deterministic multiplayer.
+- Command validation can be extended for new command types.
+- Resource events can be consumed by UI, analytics, achievements.
+
 

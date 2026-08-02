@@ -1,0 +1,12 @@
+{
+    "_comment": "Resource definitions. Each resource has: id (unique identifier), display_name (UI text), maximum (cap), starting_value (initial amount), regeneration_rate (per second).",
+    "resources": [
+        {
+            "id": "imperium",
+            "display_name": "Imperium",
+            "maximum": 20,
+            "starting_value": 5,
+            "regeneration_rate": 1.0
+        }
+    ]
+}

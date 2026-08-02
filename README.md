@@ -19,18 +19,20 @@ Everything in the game should be configurable without changing source code. The 
 ```
 res://
     scenes/              # Scene files (.tscn) and scene scripts
-    core/                # Autoload singletons and core utilities
+    core/                # Autoload singletons and core utilities (EventBus, JsonLoader, UnitState, SimulationContext)
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
     commands/            # Command framework (GameCommand, PlayCardCommand, AttackCommand, CommandDispatcher)
-    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem)
     actions/             # Action framework (GameAction, DamageAction)
+    resources/           # Resource runtime state (ResourceInstance)
     models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry)
-    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition)
+    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition)
     factories/           # Object factories (UnitFactory)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
         stages/          # Stage configurations (stage_001.json)
+        resources/       # Resource definitions (resources.json)
     assets/
         cards/           # Card artwork (future)
     docs/
@@ -43,21 +45,23 @@ The architecture follows a layered design with strict dependency direction: oute
 
 ```
 scenes/ -> commands/ -> systems/ -> actions/ -> models/ -> definitions/
-                        -> actions -> models
-                        -> entities/ -> definitions/
-                        -> core/
+                         -> actions -> models
+                         -> entities/ -> definitions/
+                         -> resources/ -> definitions/
+                         -> core/
 ```
 
 ### Core
 
-Autoloaded singletons available globally.
+Autoloaded singletons and infrastructure available globally.
 
 | Class | Responsibility |
 |---|---|
 | `JsonLoader` | Reads and parses JSON files. No game logic. |
 | `DeckSystem` | Loads card database and builds decks from JSON. |
-| `EventBus` | Global signal bus for decoupled communication between systems. |
+| `EventBus` | Global signal bus for decoupled communication between systems. Emits resource events. |
 | `UnitState` | Enum and string conversion for unit states. |
+| `SimulationContext` | Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides consistent time source for systems. |
 
 ### Commands
 
@@ -68,7 +72,7 @@ Command framework separating player intent from gameplay execution. Commands are
 | `GameCommand` | RefCounted | Base class for all commands. Contains command_id, timestamp, metadata. Immutable after creation. |
 | `PlayCardCommand` | RefCounted | Extends GameCommand. Represents player intent to spawn a unit. Carries card definition, positions, and team. |
 | `AttackCommand` | RefCounted | Extends GameCommand. Represents intent to attack. Carries attacker and target references. |
-| `CommandDispatcher` | RefCounted | Routes commands to responsible systems. Never implements gameplay logic. |
+| `CommandDispatcher` | RefCounted | Routes commands to responsible systems. Validates commands against EconomySystem before dispatching. Never implements gameplay logic. |
 
 ### Systems
 
@@ -83,6 +87,7 @@ Game logic systems that orchestrate behavior.
 | `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Produces DamageAction. Emits attack events. |
 | `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
+| `EconomySystem` | Node | Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates. |
 
 ### Models
 
@@ -102,6 +107,14 @@ Generic action framework representing gameplay operation outcomes.
 |---|---|---|
 | `GameAction` | RefCounted | Base class for all actions. Contains action_id, timestamp, source, target, metadata. Immutable after creation. |
 | `DamageAction` | RefCounted | Extends GameAction with damage, critical, blocked. Created via static factory method. |
+
+### Resources
+
+Runtime resource state for each team.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `ResourceInstance` | RefCounted | Tracks current value, generator level, and accumulated regeneration for a specific resource type. Handles regeneration logic with fractional accumulation. Emits events on changes. |
 
 ### Entities
 
@@ -124,6 +137,7 @@ Pure data containers parsed from JSON.
 | `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model). |
 | `StageDefinition` | RefCounted | Stores stage configuration (battlefield, spawn positions, formation spacing). |
 | `DeckDefinition` | RefCounted | Stores deck card IDs. |
+| `ResourceDefinition` | RefCounted | Stores resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from resources.json. |
 
 ### Factories
 
@@ -149,24 +163,43 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 | `attack_started(attacker, target)` | AttackSystem | (future) |
 | `attack_finished(action)` | AttackSystem | (future) |
 | `action_performed(action)` | CombatSystem | (future) |
+| `resource_changed(resource_id, current_value, maximum)` | EconomySystem | UI |
+| `resource_spent(resource_id, amount, remaining)` | EconomySystem | (future) |
+| `resource_generated(resource_id, amount, current_value)` | EconomySystem | (future) |
 
 ## Gameplay Flow
 
 ```
 BattleScene._ready()
   -> Load stage from JSON
-  -> Setup systems (SpawnSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, AttackSystem, CombatSystem)
-  -> Setup CommandDispatcher
+  -> Setup SimulationContext
+  -> Setup systems (SpawnSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, AttackSystem, CombatSystem, EconomySystem)
+  -> Setup CommandDispatcher (with EconomySystem for validation)
   -> Load decks from JSON
   -> Create card button UI
+  -> Setup resource panel UI
+
+BattleScene._physics_process(delta)
+  -> SimulationContext.update(delta)
+  -> EconomySystem regenerates resources
+  -> Update resource panel UI
+  -> Update card affordability (grey out unaffordable cards)
 
 Player clicks card button
   -> PlayCardCommand.create()
   -> CommandDispatcher.dispatch(command)
+     -> EconomySystem.can_afford() validation
+     -> If affordable: EconomySystem.spend()
+     -> If not affordable: return null (command rejected)
      -> SpawnSystem.spawn_unit()
         -> UnitFactory.create_unit()
         -> UnitInstance.configure_movement()
         -> EventBus.unit_spawned emitted
+
+AI spawn timer
+  -> Check if AI can afford card
+  -> If affordable: PlayCardCommand.create() -> dispatch
+  -> If not affordable: skip this frame
 
 FormationSystem._physics_process()
   -> Detect collisions between opposing units
@@ -211,15 +244,15 @@ Unit dies
 - [x] **Milestone 6** - Spatial query architecture: SpatialQuerySystem, decoupled targeting, EventBus-based combat tracking
 - [x] **Milestone 7** - Action Framework: GameAction base class, DamageAction, action pipeline, EventBus action broadcast
 - [x] **Milestone 8** - Command Framework: GameCommand base class, PlayCardCommand, AttackCommand, CommandDispatcher
+- [x] **Milestone 9** - Economy Layer: EconomySystem, ResourceDefinition, ResourceInstance, SimulationContext, command validation, resource regeneration
 
 ### Planned
 
-- [ ] **Milestone 9** - Ranged attacks: RangedAttackModel, range-based targeting
-- [ ] **Milestone 10** - Projectiles: projectile entities, travel time, visual feedback
-- [ ] **Milestone 11** - Abilities and passives: ability system, trigger conditions
-- [ ] **Milestone 12** - Status effects: buffs, debuffs, duration, stacking
-- [ ] **Milestone 13** - Victory conditions: base destruction, win/lose detection
-- [ ] **Milestone 14** - Economy: gold, card costs, deck building
+- [ ] **Milestone 10** - Ranged attacks: RangedAttackModel, range-based targeting
+- [ ] **Milestone 11** - Projectiles: projectile entities, travel time, visual feedback
+- [ ] **Milestone 12** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 13** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 14** - Victory conditions: base destruction, win/lose detection
 - [ ] **Milestone 15** - Animations and visual effects
 - [ ] **Milestone 16** - Audio: sound effects, music
 - [ ] **Milestone 17** - Menus, settings, save system
