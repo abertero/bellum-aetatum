@@ -1,13 +1,13 @@
 class_name CombatSystem
 extends Node
 
-var _attack_system: AttackSystem
+var _command_dispatcher: CommandDispatcher
 var _attack_timers: Dictionary
 var _tracked_units: Array[UnitInstance] = []
 
 
-func initialize(attack_system: AttackSystem) -> void:
-	_attack_system = attack_system
+func initialize(command_dispatcher: CommandDispatcher) -> void:
+	_command_dispatcher = command_dispatcher
 	_attack_timers = {}
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
@@ -65,7 +65,8 @@ func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: f
 	var interval: float = 1.0 / attacker.definition.attack_speed
 	if _attack_timers[attacker] >= interval:
 		_attack_timers[attacker] = 0.0
-		var action: DamageAction = _attack_system.execute(attacker, target)
+		var command: AttackCommand = AttackCommand.create(attacker, target)
+		var action: DamageAction = _command_dispatcher.dispatch(command) as DamageAction
 		_apply_damage_action(action)
 
 

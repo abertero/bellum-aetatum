@@ -21,6 +21,7 @@ res://
     scenes/              # Scene files (.tscn) and scene scripts
     core/                # Autoload singletons and core utilities
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
+    commands/            # Command framework (GameCommand, PlayCardCommand, AttackCommand, CommandDispatcher)
     systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
     actions/             # Action framework (GameAction, DamageAction)
     models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry)
@@ -41,9 +42,10 @@ res://
 The architecture follows a layered design with strict dependency direction: outer layers depend on inner layers, never the reverse.
 
 ```
-scenes/ -> systems/ -> actions/ -> models/ -> definitions/
-                      -> entities/ -> definitions/
-                      -> core/
+scenes/ -> commands/ -> systems/ -> actions/ -> models/ -> definitions/
+                        -> actions -> models
+                        -> entities/ -> definitions/
+                        -> core/
 ```
 
 ### Core
@@ -57,6 +59,17 @@ Autoloaded singletons available globally.
 | `EventBus` | Global signal bus for decoupled communication between systems. |
 | `UnitState` | Enum and string conversion for unit states. |
 
+### Commands
+
+Command framework separating player intent from gameplay execution. Commands are immutable requests that never modify game state.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `GameCommand` | RefCounted | Base class for all commands. Contains command_id, timestamp, metadata. Immutable after creation. |
+| `PlayCardCommand` | RefCounted | Extends GameCommand. Represents player intent to spawn a unit. Carries card definition, positions, and team. |
+| `AttackCommand` | RefCounted | Extends GameCommand. Represents intent to attack. Carries attacker and target references. |
+| `CommandDispatcher` | RefCounted | Routes commands to responsible systems. Never implements gameplay logic. |
+
 ### Systems
 
 Game logic systems that orchestrate behavior.
@@ -68,7 +81,7 @@ Game logic systems that orchestrate behavior.
 | `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only. |
 | `TargetingSystem` | Node | Assigns targets to melee units via SpatialQuerySystem. |
 | `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Produces DamageAction. Emits attack events. |
-| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, consumes DamageAction, applies HP. Tracks units via EventBus. |
+| `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
 
 ### Models
@@ -141,14 +154,17 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 BattleScene._ready()
   -> Load stage from JSON
   -> Setup systems (SpawnSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, AttackSystem, CombatSystem)
+  -> Setup CommandDispatcher
   -> Load decks from JSON
   -> Create card button UI
 
 Player clicks card button
-  -> SpawnSystem.spawn_unit()
-     -> UnitFactory.create_unit()
-     -> UnitInstance.configure_movement()
-     -> EventBus.unit_spawned emitted
+  -> PlayCardCommand.create()
+  -> CommandDispatcher.dispatch(command)
+     -> SpawnSystem.spawn_unit()
+        -> UnitFactory.create_unit()
+        -> UnitInstance.configure_movement()
+        -> EventBus.unit_spawned emitted
 
 FormationSystem._physics_process()
   -> Detect collisions between opposing units
@@ -164,10 +180,12 @@ TargetingSystem._physics_process()
 CombatSystem._physics_process()
   -> Track units via EventBus (unit_spawned, unit_died)
   -> Check attack timers for units with valid targets
-  -> AttackSystem.execute(attacker, target)
-     -> AttackModelRegistry.resolve(attack_model)
-     -> MeleeAttackModel.execute() -> DamageAction
-     -> EventBus.attack_started / attack_finished emitted
+  -> AttackCommand.create(attacker, target)
+  -> CommandDispatcher.dispatch(command)
+     -> AttackSystem.execute(attacker, target)
+        -> AttackModelRegistry.resolve(attack_model)
+        -> MeleeAttackModel.execute() -> DamageAction
+        -> EventBus.attack_started / attack_finished emitted
   -> Consume DamageAction via target.take_damage()
   -> EventBus.action_performed emitted with DamageAction
 
@@ -190,18 +208,19 @@ Unit dies
 - [x] **Milestone 5.5** - Attack execution architecture: AttackSystem, AttackModel abstraction, AttackModelRegistry
 - [x] **Milestone 6** - Spatial query architecture: SpatialQuerySystem, decoupled targeting, EventBus-based combat tracking
 - [x] **Milestone 7** - Action Framework: GameAction base class, DamageAction, action pipeline, EventBus action broadcast
+- [x] **Milestone 8** - Command Framework: GameCommand base class, PlayCardCommand, AttackCommand, CommandDispatcher
 
 ### Planned
 
-- [ ] **Milestone 8** - Ranged attacks: RangedAttackModel, range-based targeting
-- [ ] **Milestone 9** - Projectiles: projectile entities, travel time, visual feedback
-- [ ] **Milestone 10** - Abilities and passives: ability system, trigger conditions
-- [ ] **Milestone 11** - Status effects: buffs, debuffs, duration, stacking
-- [ ] **Milestone 12** - Victory conditions: base destruction, win/lose detection
-- [ ] **Milestone 13** - Economy: gold, card costs, deck building
-- [ ] **Milestone 14** - Animations and visual effects
-- [ ] **Milestone 15** - Audio: sound effects, music
-- [ ] **Milestone 16** - Menus, settings, save system
+- [ ] **Milestone 9** - Ranged attacks: RangedAttackModel, range-based targeting
+- [ ] **Milestone 10** - Projectiles: projectile entities, travel time, visual feedback
+- [ ] **Milestone 11** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 12** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 13** - Victory conditions: base destruction, win/lose detection
+- [ ] **Milestone 14** - Economy: gold, card costs, deck building
+- [ ] **Milestone 15** - Animations and visual effects
+- [ ] **Milestone 16** - Audio: sound effects, music
+- [ ] **Milestone 17** - Menus, settings, save system
 
 ## Architecture Rules
 

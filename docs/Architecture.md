@@ -6,11 +6,17 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 
 ```
 +------------------------------------------------------------------+
-|                         Scenes Layer                              |
-|  BattleScene - coordinates systems, handles input, manages UI     |
+|                      Input / Presentation Layer                   |
+|  BattleScene (UI) | AI (future) | Replay (future)                |
 +------------------------------------------------------------------+
          |              |              |              |
          v              v              v              v
++------------------------------------------------------------------+
+|                       Commands Layer                              |
+|  GameCommand | PlayCardCommand | AttackCommand | CommandDispatcher|
++------------------------------------------------------------------+
+         |              |              |
+         v              v              v
 +------------------------------------------------------------------+
 |                        Systems Layer                              |
 |  SpawnSystem | FormationSystem | SpatialQuerySystem              |
@@ -101,6 +107,15 @@ Generic action framework representing gameplay operation outcomes.
 - **GameAction**: Base class for all actions. Contains `action_id`, `timestamp`, `source`, `target`, `metadata`. Immutable after creation.
 - **DamageAction**: Extends `GameAction` with `damage`, `critical`, `blocked`. Created via `DamageAction.create()` factory method.
 
+### Commands Layer
+
+Command framework separating player intent from gameplay execution.
+
+- **GameCommand**: Base class for all commands. Contains `command_id`, `timestamp`, `metadata`. Immutable after creation. Commands are requests, never modify game state.
+- **PlayCardCommand**: Extends `GameCommand` with `card_definition`, `spawn_position`, `target_position`, `parent`, `team`. Created via factory method.
+- **AttackCommand**: Extends `GameCommand` with `attacker`, `target`. Created via factory method.
+- **CommandDispatcher**: Routes commands to responsible systems. Never implements gameplay logic. Translates command data into system method calls.
+
 ### Systems Layer
 
 Game logic systems that orchestrate behavior.
@@ -110,7 +125,7 @@ Game logic systems that orchestrate behavior.
 - **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only — never modifies state.
 - **TargetingSystem**: Assigns targets to melee units based on SpatialQuerySystem queries.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, delegates to AttackSystem, consumes `DamageAction`, applies HP changes. Tracks units via EventBus.
+- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 
 ### Factories Layer
@@ -123,35 +138,64 @@ Object creation logic.
 
 Scene coordination.
 
-- **BattleScene**: Coordinates all systems. Handles input, manages UI, triggers spawning.
+- **BattleScene**: Coordinates all systems. Handles input, manages UI, dispatches `PlayCardCommand`.
 
 ## Dependency Direction
 
 Dependencies flow strictly inward. Outer layers depend on inner layers, never the reverse.
 
 ```
-Scenes -> Systems -> Actions -> Models -> Entities -> Definitions -> Core
-                     -> Models -> Actions
+Input -> Commands -> Systems -> Actions -> Models -> Entities -> Definitions -> Core
+                     -> Actions -> Models
                      -> Entities -> Definitions
                      -> Core
 ```
 
 Specifically:
 
-- **BattleScene** depends on all systems, definitions, and core.
-- **CombatSystem** depends on AttackSystem, EventBus, UnitInstance, DamageAction.
+- **BattleScene** depends on CommandDispatcher, all systems, definitions, and core.
+- **CommandDispatcher** depends on Commands, SpawnSystem, AttackSystem.
+- **CombatSystem** depends on CommandDispatcher, EventBus, UnitInstance, DamageAction.
 - **TargetingSystem** depends on SpatialQuerySystem, EventBus, UnitInstance.
 - **SpatialQuerySystem** depends on FormationSystem, BattleGroup, UnitInstance.
 - **AttackSystem** depends on AttackModelRegistry, EventBus, UnitInstance, DamageAction.
 - **AttackModelRegistry** depends on AttackModel.
 - **MeleeAttackModel** depends on AttackModel, UnitInstance, DamageAction.
 - **DamageAction** depends on GameAction.
+- **PlayCardCommand** depends on GameCommand, UnitDefinition.
+- **AttackCommand** depends on GameCommand, UnitInstance.
 - **UnitInstance** depends on UnitDefinition, UnitVisualComponent, EventBus, UnitState.
 - **FormationSystem** depends on BattleGroup, UnitInstance, EventBus, UnitState.
 
-## Communication Through EventBus
+## Communication: Commands vs Actions
 
-Systems avoid direct coupling by communicating through EventBus signals.
+The architecture uses two distinct communication patterns:
+
+### Commands (Requests)
+
+Commands represent player or AI intent. They flow inward through CommandDispatcher.
+
+```
+Input Source -> GameCommand -> CommandDispatcher -> System
+```
+
+- Commands never travel through EventBus.
+- Commands are synchronous requests.
+- Commands never modify game state directly.
+- Systems execute commands and produce actions.
+
+### Actions (Results)
+
+Actions represent outcomes of executed commands. They flow outward through EventBus.
+
+```
+System -> GameAction -> EventBus -> Listeners
+```
+
+- Actions are broadcast via EventBus signals.
+- Actions are asynchronous notifications.
+- Actions are immutable records of what happened.
+- Any system can listen to actions without coupling.
 
 ### Signal Flow
 
@@ -167,34 +211,42 @@ CombatSystem         --[action_performed]----> (future listeners)
 
 ### Rules
 
-1. Systems emit signals to announce events.
-2. Systems listen to signals to react to events.
-3. Systems never call methods on other systems directly (except through initialization injection).
-4. EventBus is the only shared global state.
-5. Gameplay actions are broadcast as `GameAction` objects, not primitive values.
+1. Input sources create commands and dispatch them.
+2. CommandDispatcher routes commands to systems.
+3. Systems execute commands and produce actions.
+4. Systems emit signals to announce events.
+5. Systems listen to signals to react to events.
+6. Systems never call methods on other systems directly (except through initialization injection).
+7. EventBus is the only shared global state.
+8. Gameplay actions are broadcast as `GameAction` objects, not primitive values.
+9. Commands never travel through EventBus.
 
 ## Object Lifecycle
 
 ### UnitInstance Lifecycle
 
 ```
-1. BattleScene._on_card_pressed()
-2. SpawnSystem.spawn_unit()
+1. Player clicks card button
+2. BattleScene creates PlayCardCommand
+3. CommandDispatcher.dispatch(command)
+4. SpawnSystem.spawn_unit()
    a. UnitFactory.create_unit() - instantiates PackedScene
    b. UnitInstance.initialize() - sets definition, hp, visuals
    c. UnitInstance.configure_movement() - sets target position
-3. EventBus.unit_spawned emitted
-4. FormationSystem registers unit
-5. UnitInstance._physics_process() runs each frame
+5. EventBus.unit_spawned emitted
+6. FormationSystem registers unit
+7. UnitInstance._physics_process() runs each frame
    a. State machine drives behavior
    b. Movement toward formation or target position
    c. Target validation
-6. CombatSystem triggers attacks via AttackSystem
-7. AttackSystem produces DamageAction
-8. CombatSystem consumes DamageAction, applies HP via target.take_damage()
-9. EventBus.action_performed emitted with DamageAction
-10. UnitInstance dies -> EventBus.unit_died emitted
-11. FormationSystem removes unit and frees node
+8. CombatSystem detects attack timer expiry
+9. CombatSystem creates AttackCommand
+10. CommandDispatcher.dispatch(command)
+11. AttackSystem produces DamageAction
+12. CombatSystem consumes DamageAction, applies HP via target.take_damage()
+13. EventBus.action_performed emitted with DamageAction
+14. UnitInstance dies -> EventBus.unit_died emitted
+15. FormationSystem removes unit and frees node
 ```
 
 ### BattleGroup Lifecycle
@@ -216,7 +268,8 @@ CombatSystem         --[action_performed]----> (future listeners)
 ```
 _physics_process(delta):
   1. BattleScene._physics_process()
-     -> _update_enemy_spawn_timer() -> SpawnSystem.spawn_unit()
+     -> _update_enemy_spawn_timer()
+        -> PlayCardCommand -> CommandDispatcher -> SpawnSystem
      -> _update_debug_panel()
 
   2. FormationSystem._physics_process()
@@ -235,9 +288,10 @@ _physics_process(delta):
      -> _process_all_units()
         -> _process_unit_combat() for each unit with target
            -> _update_attack_timer()
-              -> AttackSystem.execute()
-                 -> AttackModelRegistry.resolve()
-                 -> MeleeAttackModel.execute() -> DamageAction
+              -> AttackCommand -> CommandDispatcher
+                 -> AttackSystem.execute()
+                    -> AttackModelRegistry.resolve()
+                    -> MeleeAttackModel.execute() -> DamageAction
               -> _apply_damage_action()
                  -> target.take_damage()
                  -> EventBus.action_performed.emit(action)
@@ -247,19 +301,34 @@ _physics_process(delta):
      -> State machine processing
 ```
 
+### Command Execution Flow
+
+```
+Player Input / AI / Replay
+  -> Create GameCommand (immutable request)
+  -> CommandDispatcher.dispatch(command)
+     -> Route to appropriate system
+     -> System executes command
+     -> System produces GameAction (if applicable)
+  -> EventBus broadcasts GameAction
+  -> Listeners react to GameAction
+```
+
 ### Attack Execution Flow
 
 ```
 CombatSystem._update_attack_timer()
   -> timer reaches interval (1.0 / attack_speed)
-  -> AttackSystem.execute(attacker, target)
-     -> EventBus.attack_started.emit(attacker, target)
-     -> _resolve_damage(attacker, target)
-        -> model_key = attacker.definition.attack_model
-        -> AttackModelRegistry.resolve(model_key)
-        -> model.execute(attacker, target)
-           -> MeleeAttackModel: DamageAction.create(attacker.definition.attack, attacker, target)
-     -> EventBus.attack_finished.emit(action)
+  -> AttackCommand.create(attacker, target)
+  -> CommandDispatcher.dispatch(command)
+     -> AttackSystem.execute(attacker, target)
+        -> EventBus.attack_started.emit(attacker, target)
+        -> _resolve_damage(attacker, target)
+           -> model_key = attacker.definition.attack_model
+           -> AttackModelRegistry.resolve(model_key)
+           -> model.execute(attacker, target)
+              -> MeleeAttackModel: DamageAction.create(attacker.definition.attack, attacker, target)
+        -> EventBus.attack_finished.emit(action)
   -> CombatSystem._apply_damage_action(action)
      -> target.take_damage(action.damage)
         -> if not alive: EventBus.unit_died.emit(target)

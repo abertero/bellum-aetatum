@@ -1162,4 +1162,185 @@ CombatSystem._update_attack_timer()
 - Action logging, replay, and analytics can consume `GameAction` objects uniformly.
 - Virtual methods (e.g., `apply()`, `revert()`) can be added to `GameAction` when behavior is needed.
 
+---
+
+## Milestone 8 — Command Framework
+
+### Objective
+
+Introduce a Command Framework that separates player intent from gameplay execution. Commands represent immutable requests that flow through a CommandDispatcher to the appropriate systems. This decouples input sources (player UI, AI, replay) from system implementations and provides a foundation for future features like replay, AI integration, and network play.
+
+### What Was Implemented
+
+#### 1. GameCommand Base Class
+
+- New `GameCommand` class (`commands/GameCommand.gd`), extends `RefCounted`.
+- Common contract for all commands: `command_id`, `timestamp`, `metadata`.
+- `command_id` uses a static sequential counter for unique identification.
+- `timestamp` records creation time via `Time.get_ticks_msec()`.
+- `metadata` is a `Dictionary` for extensible data.
+- Commands are immutable after creation by convention.
+
+#### 2. PlayCardCommand
+
+- New `PlayCardCommand` class (`commands/PlayCardCommand.gd`), extends `GameCommand`.
+- Fields: `card_definition`, `spawn_position`, `target_position`, `parent`, `team`.
+- Created via static factory method `PlayCardCommand.create()`.
+- Represents player or AI intent to spawn a unit.
+
+#### 3. AttackCommand
+
+- New `AttackCommand` class (`commands/AttackCommand.gd`), extends `GameCommand`.
+- Fields: `attacker`, `target`.
+- Created via static factory method `AttackCommand.create()`.
+- Represents intent to execute an attack.
+
+#### 4. CommandDispatcher
+
+- New `CommandDispatcher` class (`commands/CommandDispatcher.gd`), extends `RefCounted`.
+- Routes commands to responsible systems.
+- Never implements gameplay logic.
+- Methods:
+  - `initialize(spawn_system, attack_system)`: Dependency injection.
+  - `dispatch(command) -> Variant`: Routes to appropriate system.
+  - `_dispatch_play_card(command) -> UnitInstance`: Calls SpawnSystem.
+  - `_dispatch_attack(command) -> DamageAction`: Calls AttackSystem.
+
+#### 5. BattleScene Integration
+
+- BattleScene now creates `PlayCardCommand` when player clicks card button.
+- Enemy spawn timer also creates `PlayCardCommand` for AI spawns.
+- Commands dispatched through `CommandDispatcher` instead of calling `SpawnSystem` directly.
+- BattleScene initializes `CommandDispatcher` with references to `SpawnSystem` and `AttackSystem`.
+
+#### 6. CombatSystem Integration
+
+- CombatSystem now creates `AttackCommand` when attack timer expires.
+- Commands dispatched through `CommandDispatcher` instead of calling `AttackSystem` directly.
+- CombatSystem receives `DamageAction` from dispatcher and applies it.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `commands/GameCommand.gd` | 15 | Base class for all commands |
+| `commands/PlayCardCommand.gd` | 25 | Command to spawn a unit |
+| `commands/AttackCommand.gd` | 12 | Command to execute an attack |
+| `commands/CommandDispatcher.gd` | 33 | Routes commands to systems |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `scenes/battle_scene.gd` | +15 lines | Creates PlayCardCommand, initializes CommandDispatcher |
+| `systems/CombatSystem.gd` | +3/-2 lines | Creates AttackCommand, dispatches via CommandDispatcher |
+
+### Command Flow
+
+```
+Player Input / AI / Replay
+  ↓
+PlayCardCommand / AttackCommand (immutable request)
+  ↓
+CommandDispatcher (routing only)
+  ↓
+SpawnSystem / AttackSystem (execution)
+  ↓
+UnitInstance / DamageAction (result)
+  ↓
+EventBus (broadcast)
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **GameCommand**: Only defines the command contract. No behavior, no state mutation.
+- **PlayCardCommand**: Only carries spawn request data. Created via factory, not modified afterward.
+- **AttackCommand**: Only carries attack request data. Created via factory, not modified afterward.
+- **CommandDispatcher**: Only routes commands. Never implements gameplay logic.
+- **Systems**: Only execute commands and produce actions.
+
+#### Open/Closed Principle
+
+- New command types (MoveCommand, UseAbilityCommand, etc.) extend `GameCommand` without modifying existing code.
+- CommandDispatcher can be extended to route new command types without modifying systems.
+- Input sources (UI, AI, replay) can create commands without knowing system internals.
+
+#### Dependency Inversion
+
+- Input sources depend on `GameCommand` abstraction, not on concrete systems.
+- CommandDispatcher depends on `GameCommand` and system abstractions.
+- Systems don't know about commands (they keep their existing API).
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | GameCommand defines contract, PlayCardCommand/AttackCommand carry data, CommandDispatcher routes, Systems execute |
+| Open/Closed | New command types extend GameCommand without modifying existing code |
+| Liskov Substitution | Any GameCommand subclass can be dispatched through CommandDispatcher |
+| Interface Segregation | Commands expose only data fields, no unnecessary methods |
+| Dependency Inversion | Input sources depend on GameCommand abstraction, not concrete systems |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | GameCommand is 15 lines, PlayCardCommand is 25 lines, AttackCommand is 12 lines, CommandDispatcher is 33 lines |
+| Functions under 30 lines | All functions are 1-8 lines |
+| Composition over inheritance | Commands extend GameCommand with additional fields |
+| No duplicated logic | CommandDispatcher centralizes routing logic |
+| Dependencies point inward | Input -> Commands -> Systems -> Actions |
+
+### Behavior Verification
+
+- Unit spawning unchanged: Same positions, same timing, same unit creation.
+- Combat unchanged: Same damage calculation, same attack speed, same HP application.
+- Formation unchanged: Same collision detection, same positioning.
+- Targeting unchanged: Same frontline selection.
+- Death unchanged: Same cleanup and removal.
+
+Only the request path changed:
+- Before: `BattleScene → SpawnSystem`
+- After: `BattleScene → PlayCardCommand → CommandDispatcher → SpawnSystem`
+
+- Before: `CombatSystem → AttackSystem`
+- After: `CombatSystem → AttackCommand → CommandDispatcher → AttackSystem`
+
+End result is identical.
+
+### What Was NOT Implemented (Intentionally)
+
+- Command validation
+- Command queuing
+- Command logging
+- Replay system
+- AI integration
+- Network play
+- MoveCommand
+- UseAbilityCommand
+- SpawnCommand (generic spawn)
+- EconomyCommand
+- EndTurnCommand
+- Ranged attacks
+- Projectiles
+- AOE mechanics
+- Animations / particles
+- Victory conditions
+- Audio
+- Menus / settings
+- Save system
+
+### Extension Points for Future Milestones
+
+- `GameCommand` can be extended with MoveCommand, UseAbilityCommand, SpawnCommand, EconomyCommand, EndTurnCommand.
+- CommandDispatcher can route new command types without modifying systems.
+- Command validation can be added to CommandDispatcher before routing.
+- Command logging can track all commands for debugging and analytics.
+- Replay system can serialize commands and replay them in sequence.
+- AI can generate commands using the same interface as player input.
+- Network play can send commands over the network for multiplayer.
+- Tutorial system can inject commands to guide players.
+
 

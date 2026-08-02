@@ -14,6 +14,7 @@ var _spatial_query: SpatialQuerySystem
 var _targeting_system: TargetingSystem
 var _attack_system: AttackSystem
 var _combat_system: CombatSystem
+var _command_dispatcher: CommandDispatcher
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
@@ -28,6 +29,7 @@ func _ready() -> void:
 	_setup_spatial_query_system()
 	_setup_targeting_system()
 	_setup_attack_system()
+	_setup_command_dispatcher()
 	_setup_combat_system()
 	_load_decks()
 	_create_card_buttons()
@@ -108,9 +110,14 @@ func _setup_attack_system() -> void:
 	_attack_system = AttackSystem.new(registry)
 
 
+func _setup_command_dispatcher() -> void:
+	_command_dispatcher = CommandDispatcher.new()
+	_command_dispatcher.initialize(_spawn_system, _attack_system)
+
+
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
-	_combat_system.initialize(_attack_system)
+	_combat_system.initialize(_command_dispatcher)
 	add_child(_combat_system)
 
 
@@ -191,7 +198,8 @@ func _on_card_pressed(card_def: UnitDefinition) -> void:
 	var target_pos: Vector2 = _stage_definition.enemy_spawn_position
 	var target_position := Vector2(target_pos.x, target_pos.y)
 
-	var unit: UnitInstance = _spawn_system.spawn_unit(card_def, position, target_position, _unit_container, "player")
+	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "player")
+	_command_dispatcher.dispatch(command)
 	print("BattleScene: spawned %s" % card_def.name)
 
 
@@ -210,7 +218,8 @@ func _spawn_enemy_unit() -> void:
 	var target_pos: Vector2 = _stage_definition.player_spawn_position
 	var target_position := Vector2(target_pos.x, target_pos.y)
 
-	var unit: UnitInstance = _spawn_system.spawn_unit(card_def, position, target_position, _unit_container, "enemy")
+	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "enemy")
+	_command_dispatcher.dispatch(command)
 	print("BattleScene: spawned enemy %s" % card_def.name)
 
 
