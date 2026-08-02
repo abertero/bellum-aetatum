@@ -997,4 +997,169 @@ After:
 - New queries can be added without modifying existing methods or callers.
 - `BattleGroup` internal implementation can be replaced without API changes.
 
+---
+
+## Milestone 8 — Action Framework
+
+### Objective
+
+Introduce a generic Action Framework that represents the outcome of gameplay operations as first-class objects. The attack pipeline now produces `DamageAction` instead of `DamageResult`. `CombatSystem` consumes `DamageAction` and broadcasts it through `EventBus`. Gameplay remains identical.
+
+### What Was Implemented
+
+#### 1. GameAction Base Class
+
+- New `GameAction` class (`actions/GameAction.gd`), extends `RefCounted`.
+- Common contract for all actions: `action_id`, `timestamp`, `source`, `target`, `metadata`.
+- `action_id` uses a static sequential counter for unique identification.
+- `timestamp` records creation time via `Time.get_ticks_msec()`.
+- `metadata` is a `Dictionary` for extensible data.
+- Actions are immutable after creation by convention.
+
+#### 2. DamageAction
+
+- New `DamageAction` class (`actions/DamageAction.gd`), extends `GameAction`.
+- Fields: `damage`, `critical`, `blocked`.
+- Created via static factory method `DamageAction.create(damage, source, target, critical, blocked, metadata)`.
+- Replaces `DamageResult` entirely — no duplicated result structures.
+
+#### 3. Attack Pipeline Update
+
+- `AttackModel.execute()` now returns `DamageAction` instead of `DamageResult`.
+- `MeleeAttackModel.execute()` creates `DamageAction` via factory method.
+- `AttackSystem.execute()` returns `DamageAction`.
+- `CombatSystem._apply_damage_action()` consumes `DamageAction`, applies HP, broadcasts via `EventBus.action_performed`.
+
+#### 4. EventBus Update
+
+- `attack_finished` now carries a `GameAction` instead of separate attacker/target/result parameters.
+- `action_performed(action: GameAction)` is a new generic signal for broadcasting any action.
+- `unit_damaged(unit, damage)` is removed. `action_performed` replaces it with a rich object.
+
+#### 5. UnitInstance Update
+
+- `take_damage()` no longer emits `unit_damaged`. The `action_performed` signal covers this use case with a `GameAction` object.
+- `unit_died` emission is unchanged.
+
+#### 6. DamageResult Removal
+
+- `models/DamageResult.gd` and its `.uid` file are removed.
+- `DamageAction` is the single damage outcome type.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `actions/GameAction.gd` | 17 | Base class for all gameplay actions |
+| `actions/DamageAction.gd` | 13 | Damage action with factory method |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `models/AttackModel.gd` | Return type changed | Returns `DamageAction` instead of `DamageResult` |
+| `models/MeleeAttackModel.gd` | Return type and creation changed | Creates `DamageAction` via factory |
+| `systems/AttackSystem.gd` | Return type changed | Returns `DamageAction` instead of `DamageResult` |
+| `systems/CombatSystem.gd` | Method renamed and updated | `_apply_damage_action` consumes `DamageAction`, emits `action_performed` |
+| `core/EventBus.gd` | Signals updated | `attack_finished` carries `GameAction`, `action_performed` added, `unit_damaged` removed |
+| `entities/UnitInstance.gd` | -1 line | Removed `unit_damaged` emission from `take_damage()` |
+
+### Files Deleted
+
+| File | Reason |
+|---|---|
+| `models/DamageResult.gd` | Replaced by `DamageAction` |
+| `models/DamageResult.gd.uid` | Associated UID file |
+
+### Attack Flow
+
+```
+CombatSystem._update_attack_timer()
+  -> timer expires
+  -> AttackSystem.execute(attacker, target)
+     -> EventBus.attack_started.emit(attacker, target)
+     -> _resolve_damage(attacker, target)
+        -> AttackModelRegistry.resolve(model_key)
+        -> MeleeAttackModel.execute(attacker, target)
+           -> DamageAction.create(attack, attacker, target)
+     -> EventBus.attack_finished.emit(action)
+  -> CombatSystem._apply_damage_action(action)
+     -> target.take_damage(action.damage)
+        -> if not alive: EventBus.unit_died.emit(target)
+     -> EventBus.action_performed.emit(action)
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **GameAction**: Only defines the action contract. No behavior, no state mutation.
+- **DamageAction**: Only carries damage-specific data. Created via factory, not modified afterward.
+- **CombatSystem**: Consumes actions and applies HP. Does not create actions.
+- **AttackSystem**: Produces actions. Does not apply them.
+
+#### Open/Closed Principle
+
+- New action types (HealAction, SpawnAction, etc.) extend `GameAction` without modifying existing code.
+- `action_performed` signal handles any `GameAction` subtype. No new signals needed per action type.
+
+#### Dependency Inversion
+
+- Systems depend on `GameAction` abstraction, not on concrete damage types.
+- EventBus broadcasts `GameAction`, not primitive values.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | GameAction defines contract, DamageAction carries damage data, CombatSystem applies, AttackSystem produces |
+| Open/Closed | New action types extend GameAction without modifying existing code |
+| Liskov Substitution | Any GameAction subclass can be broadcast through action_performed |
+| Interface Segregation | Actions expose only data fields, no unnecessary methods |
+| Dependency Inversion | Systems depend on GameAction abstraction, not concrete implementations |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | GameAction is 17 lines, DamageAction is 13 lines |
+| Functions under 30 lines | All functions are 1-6 lines |
+| Composition over inheritance | DamageAction extends GameAction with additional fields |
+| No duplicated result structures | DamageResult removed, DamageAction is the single damage outcome type |
+| Dependencies point inward | CombatSystem -> DamageAction -> GameAction |
+
+### Behavior Verification
+
+- Damage calculation unchanged: `MeleeAttackModel` still reads `attacker.definition.attack`.
+- HP application unchanged: `CombatSystem` still calls `target.take_damage(action.damage)`.
+- Attack timing unchanged: same timer logic, same `AttackSystem.execute()` path.
+- Unit death unchanged: `UnitInstance.take_damage()` still emits `unit_died` when HP reaches 0.
+- Formation unchanged: `FormationSystem` still handles death cleanup.
+- Targeting unchanged: `TargetingSystem` still assigns frontlines.
+
+### What Was NOT Implemented (Intentionally)
+
+- HealAction
+- SpawnAction
+- ProjectileAction
+- StatusEffectAction
+- AbilityAction
+- EconomyAction
+- Ranged attacks
+- Projectiles
+- AOE mechanics
+- Animations / particles
+- Victory conditions
+- Audio
+- Menus / settings
+- Save system
+
+### Extension Points for Future Milestones
+
+- `GameAction` can be extended with HealAction, SpawnAction, ProjectileAction, StatusEffectAction, AbilityAction, EconomyAction.
+- `action_performed` signal handles any action type uniformly.
+- `metadata` dictionary allows per-action extensible data without modifying the base class.
+- Action logging, replay, and analytics can consume `GameAction` objects uniformly.
+- Virtual methods (e.g., `apply()`, `revert()`) can be added to `GameAction` when behavior is needed.
+
 

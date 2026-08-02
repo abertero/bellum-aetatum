@@ -71,7 +71,6 @@ func is_melee() -> bool:
 func take_damage(amount: int) -> void:
 	current_hp = max(0, current_hp - amount)
 	_visual.update_hp_display(current_hp, definition.hp)
-	EventBus.unit_damaged.emit(self, amount)
 	if not is_alive():
 		_set_state(UnitState.State.DEAD)
 		EventBus.unit_died.emit(self)

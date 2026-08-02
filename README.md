@@ -22,7 +22,8 @@ res://
     core/                # Autoload singletons and core utilities
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
     systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem)
-    models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry, DamageResult)
+    actions/             # Action framework (GameAction, DamageAction)
+    models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry)
     definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition)
     factories/           # Object factories (UnitFactory)
     data/
@@ -40,9 +41,9 @@ res://
 The architecture follows a layered design with strict dependency direction: outer layers depend on inner layers, never the reverse.
 
 ```
-scenes/ -> systems/ -> models/ -> definitions/
-                     -> entities/ -> definitions/
-                     -> core/
+scenes/ -> systems/ -> actions/ -> models/ -> definitions/
+                      -> entities/ -> definitions/
+                      -> core/
 ```
 
 ### Core
@@ -66,8 +67,8 @@ Game logic systems that orchestrate behavior.
 | `FormationSystem` | Node | Detects collisions, manages battle groups and formations. |
 | `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only. |
 | `TargetingSystem` | Node | Assigns targets to melee units via SpatialQuerySystem. |
-| `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Emits attack events. |
-| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. Tracks units via EventBus. |
+| `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Produces DamageAction. Emits attack events. |
+| `CombatSystem` | Node | Orchestrates combat timing, delegates to AttackSystem, consumes DamageAction, applies HP. Tracks units via EventBus. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
 
 ### Models
@@ -76,10 +77,18 @@ Attack model abstraction and registry.
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `AttackModel` | RefCounted | Abstract base class defining the attack execution contract. |
-| `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition. |
+| `AttackModel` | RefCounted | Abstract base class defining the attack execution contract. Returns `DamageAction`. |
+| `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition. Produces `DamageAction`. |
 | `AttackModelRegistry` | RefCounted | Registers and resolves attack models by identifier. |
-| `DamageResult` | RefCounted | Data carrier for attack results (damage, source, target, critical, blocked). |
+
+### Actions
+
+Generic action framework representing gameplay operation outcomes.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `GameAction` | RefCounted | Base class for all actions. Contains action_id, timestamp, source, target, metadata. Immutable after creation. |
+| `DamageAction` | RefCounted | Extends GameAction with damage, critical, blocked. Created via static factory method. |
 
 ### Entities
 
@@ -119,12 +128,12 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 | `battle_ended` | (future) | (future) |
 | `unit_spawned(unit)` | SpawnSystem | FormationSystem, CombatSystem |
 | `unit_moved(unit)` | (future) | (future) |
-| `unit_damaged(unit, damage)` | UnitInstance | (future) |
 | `unit_died(unit)` | UnitInstance | FormationSystem, CombatSystem |
 | `frontline_changed(group)` | FormationSystem | (future) |
 | `target_changed(unit, target)` | TargetingSystem | (future) |
 | `attack_started(attacker, target)` | AttackSystem | (future) |
-| `attack_finished(attacker, target, result)` | AttackSystem | (future) |
+| `attack_finished(action)` | AttackSystem | (future) |
+| `action_performed(action)` | CombatSystem | (future) |
 
 ## Gameplay Flow
 
@@ -157,9 +166,10 @@ CombatSystem._physics_process()
   -> Check attack timers for units with valid targets
   -> AttackSystem.execute(attacker, target)
      -> AttackModelRegistry.resolve(attack_model)
-     -> MeleeAttackModel.execute() -> DamageResult
+     -> MeleeAttackModel.execute() -> DamageAction
      -> EventBus.attack_started / attack_finished emitted
-  -> Apply DamageResult via target.take_damage()
+  -> Consume DamageAction via target.take_damage()
+  -> EventBus.action_performed emitted with DamageAction
 
 Unit dies
   -> EventBus.unit_died emitted
@@ -179,18 +189,19 @@ Unit dies
 - [x] **Milestone 5** - Battlefield targeting: TargetingSystem, ordered formations, frontline advancement
 - [x] **Milestone 5.5** - Attack execution architecture: AttackSystem, AttackModel abstraction, AttackModelRegistry
 - [x] **Milestone 6** - Spatial query architecture: SpatialQuerySystem, decoupled targeting, EventBus-based combat tracking
+- [x] **Milestone 7** - Action Framework: GameAction base class, DamageAction, action pipeline, EventBus action broadcast
 
 ### Planned
 
-- [ ] **Milestone 7** - Ranged attacks: RangedAttackModel, range-based targeting
-- [ ] **Milestone 8** - Projectiles: projectile entities, travel time, visual feedback
-- [ ] **Milestone 9** - Abilities and passives: ability system, trigger conditions
-- [ ] **Milestone 10** - Status effects: buffs, debuffs, duration, stacking
-- [ ] **Milestone 11** - Victory conditions: base destruction, win/lose detection
-- [ ] **Milestone 12** - Economy: gold, card costs, deck building
-- [ ] **Milestone 13** - Animations and visual effects
-- [ ] **Milestone 14** - Audio: sound effects, music
-- [ ] **Milestone 15** - Menus, settings, save system
+- [ ] **Milestone 8** - Ranged attacks: RangedAttackModel, range-based targeting
+- [ ] **Milestone 9** - Projectiles: projectile entities, travel time, visual feedback
+- [ ] **Milestone 10** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 11** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 12** - Victory conditions: base destruction, win/lose detection
+- [ ] **Milestone 13** - Economy: gold, card costs, deck building
+- [ ] **Milestone 14** - Animations and visual effects
+- [ ] **Milestone 15** - Audio: sound effects, music
+- [ ] **Milestone 16** - Menus, settings, save system
 
 ## Architecture Rules
 

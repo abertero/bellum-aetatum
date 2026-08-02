@@ -19,9 +19,14 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          |              |              |
          v              v              v
 +------------------------------------------------------------------+
+|                        Actions Layer                              |
+|  GameAction | DamageAction                                       |
++------------------------------------------------------------------+
+         |              |
+         v              v
++------------------------------------------------------------------+
 |                        Models Layer                               |
 |  AttackModelRegistry | AttackModel | MeleeAttackModel            |
-|  DamageResult                                                    |
 +------------------------------------------------------------------+
          |              |
          v              v
@@ -61,7 +66,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 
 Autoloaded singletons providing infrastructure services available globally.
 
-- **EventBus**: Global signal bus. All inter-system communication flows through EventBus signals. Systems emit and listen to signals without knowing about each other.
+- **EventBus**: Global signal bus. All inter-system communication flows through EventBus signals. Systems emit and listen to signals without knowing about each other. Broadcasts `GameAction` objects for gameplay operations.
 - **JsonLoader**: Reads JSON files from disk and returns parsed data. Has no knowledge of game concepts.
 - **UnitState**: Enum defining unit states (MOVING, WAITING, BLOCKED, ATTACKING, DEAD) and string conversion utility.
 
@@ -85,10 +90,16 @@ Runtime game objects that exist in the scene tree.
 
 Attack model abstraction and registry.
 
-- **AttackModel**: Abstract base class defining the `execute(attacker, target) -> DamageResult` contract.
-- **MeleeAttackModel**: Implements melee damage calculation.
+- **AttackModel**: Abstract base class defining the `execute(attacker, target) -> DamageAction` contract.
+- **MeleeAttackModel**: Implements melee damage calculation, produces `DamageAction`.
 - **AttackModelRegistry**: Registers and resolves attack models by string identifier.
-- **DamageResult**: Data carrier for attack results.
+
+### Actions Layer
+
+Generic action framework representing gameplay operation outcomes.
+
+- **GameAction**: Base class for all actions. Contains `action_id`, `timestamp`, `source`, `target`, `metadata`. Immutable after creation.
+- **DamageAction**: Extends `GameAction` with `damage`, `critical`, `blocked`. Created via `DamageAction.create()` factory method.
 
 ### Systems Layer
 
@@ -98,8 +109,8 @@ Game logic systems that orchestrate behavior.
 - **FormationSystem**: Detects collisions, creates BattleGroups, manages formation positioning.
 - **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only — never modifies state.
 - **TargetingSystem**: Assigns targets to melee units based on SpatialQuerySystem queries.
-- **AttackSystem**: Executes attacks via AttackModelRegistry. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, delegates to AttackSystem, applies DamageResult. Tracks units via EventBus.
+- **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
+- **CombatSystem**: Orchestrates combat timing, delegates to AttackSystem, consumes `DamageAction`, applies HP changes. Tracks units via EventBus.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 
 ### Factories Layer
@@ -119,20 +130,22 @@ Scene coordination.
 Dependencies flow strictly inward. Outer layers depend on inner layers, never the reverse.
 
 ```
-Scenes -> Systems -> Models -> Entities -> Definitions -> Core
-                    -> Entities -> Definitions
-                    -> Core
+Scenes -> Systems -> Actions -> Models -> Entities -> Definitions -> Core
+                     -> Models -> Actions
+                     -> Entities -> Definitions
+                     -> Core
 ```
 
 Specifically:
 
 - **BattleScene** depends on all systems, definitions, and core.
-- **CombatSystem** depends on AttackSystem, EventBus, UnitInstance.
+- **CombatSystem** depends on AttackSystem, EventBus, UnitInstance, DamageAction.
 - **TargetingSystem** depends on SpatialQuerySystem, EventBus, UnitInstance.
 - **SpatialQuerySystem** depends on FormationSystem, BattleGroup, UnitInstance.
-- **AttackSystem** depends on AttackModelRegistry, EventBus, UnitInstance.
+- **AttackSystem** depends on AttackModelRegistry, EventBus, UnitInstance, DamageAction.
 - **AttackModelRegistry** depends on AttackModel.
-- **MeleeAttackModel** depends on AttackModel, UnitInstance, DamageResult.
+- **MeleeAttackModel** depends on AttackModel, UnitInstance, DamageAction.
+- **DamageAction** depends on GameAction.
 - **UnitInstance** depends on UnitDefinition, UnitVisualComponent, EventBus, UnitState.
 - **FormationSystem** depends on BattleGroup, UnitInstance, EventBus, UnitState.
 
@@ -149,7 +162,7 @@ FormationSystem      --[frontline_changed]---> (future listeners)
 TargetingSystem      --[target_changed]------> (future listeners)
 AttackSystem         --[attack_started]------> (future listeners)
 AttackSystem         --[attack_finished]-----> (future listeners)
-UnitInstance         --[unit_damaged]--------> (future listeners)
+CombatSystem         --[action_performed]----> (future listeners)
 ```
 
 ### Rules
@@ -158,6 +171,7 @@ UnitInstance         --[unit_damaged]--------> (future listeners)
 2. Systems listen to signals to react to events.
 3. Systems never call methods on other systems directly (except through initialization injection).
 4. EventBus is the only shared global state.
+5. Gameplay actions are broadcast as `GameAction` objects, not primitive values.
 
 ## Object Lifecycle
 
@@ -176,9 +190,11 @@ UnitInstance         --[unit_damaged]--------> (future listeners)
    b. Movement toward formation or target position
    c. Target validation
 6. CombatSystem triggers attacks via AttackSystem
-7. UnitInstance.take_damage() reduces HP
-8. UnitInstance dies -> EventBus.unit_died emitted
-9. FormationSystem removes unit and frees node
+7. AttackSystem produces DamageAction
+8. CombatSystem consumes DamageAction, applies HP via target.take_damage()
+9. EventBus.action_performed emitted with DamageAction
+10. UnitInstance dies -> EventBus.unit_died emitted
+11. FormationSystem removes unit and frees node
 ```
 
 ### BattleGroup Lifecycle
@@ -221,8 +237,10 @@ _physics_process(delta):
            -> _update_attack_timer()
               -> AttackSystem.execute()
                  -> AttackModelRegistry.resolve()
-                 -> MeleeAttackModel.execute()
-              -> _apply_damage_result()
+                 -> MeleeAttackModel.execute() -> DamageAction
+              -> _apply_damage_action()
+                 -> target.take_damage()
+                 -> EventBus.action_performed.emit(action)
 
   5. UnitInstance._physics_process() (each unit)
      -> _validate_target()
@@ -240,10 +258,10 @@ CombatSystem._update_attack_timer()
         -> model_key = attacker.definition.attack_model
         -> AttackModelRegistry.resolve(model_key)
         -> model.execute(attacker, target)
-           -> MeleeAttackModel: DamageResult { damage: attacker.definition.attack }
-     -> EventBus.attack_finished.emit(attacker, target, result)
-  -> CombatSystem._apply_damage_result(result)
-     -> target.take_damage(result.damage)
-        -> EventBus.unit_damaged.emit(target, damage)
+           -> MeleeAttackModel: DamageAction.create(attacker.definition.attack, attacker, target)
+     -> EventBus.attack_finished.emit(action)
+  -> CombatSystem._apply_damage_action(action)
+     -> target.take_damage(action.damage)
         -> if not alive: EventBus.unit_died.emit(target)
+     -> EventBus.action_performed.emit(action)
 ```

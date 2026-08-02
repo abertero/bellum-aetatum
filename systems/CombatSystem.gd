@@ -65,16 +65,17 @@ func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: f
 	var interval: float = 1.0 / attacker.definition.attack_speed
 	if _attack_timers[attacker] >= interval:
 		_attack_timers[attacker] = 0.0
-		var result: DamageResult = _attack_system.execute(attacker, target)
-		_apply_damage_result(result)
+		var action: DamageAction = _attack_system.execute(attacker, target)
+		_apply_damage_action(action)
 
 
-func _apply_damage_result(result: DamageResult) -> void:
-	if result.target == null or not is_instance_valid(result.target):
+func _apply_damage_action(action: DamageAction) -> void:
+	if action.target == null or not is_instance_valid(action.target):
 		return
-	if not result.target.is_alive():
+	if not action.target.is_alive():
 		return
-	result.target.take_damage(result.damage)
+	action.target.take_damage(action.damage)
+	EventBus.action_performed.emit(action)
 
 
 func _on_unit_spawned(unit: UnitInstance) -> void:
