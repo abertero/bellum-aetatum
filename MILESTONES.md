@@ -1343,4 +1343,74 @@ End result is identical.
 - Network play can send commands over the network for multiplayer.
 - Tutorial system can inject commands to guide players.
 
+---
+
+## Hotfix — Unit Movement After Combat
+
+### Problem
+
+When a unit defeated its enemy, it remained stationary instead of continuing to advance. The unit's state correctly changed from ATTACKING to MOVING, but the unit did not physically move.
+
+### Root Cause
+
+Two issues caused this behavior:
+
+1. **Movement flags not reset**: When a unit arrived at its formation position, `_has_reached_target` was set to `true`. After combat, when the unit transitioned back to MOVING state, `_process_moving()` checked `_has_reached_target` and returned immediately without moving.
+
+2. **BattleGroup not dissolved**: When all enemies in a BattleGroup died, the surviving units remained assigned to the BattleGroup. They had `battle_group` set, `_has_reached_target = true`, and `_has_formation_target = true`, preventing movement.
+
+### Solution
+
+**Modified 2 files:**
+
+1. **`entities/UnitInstance.gd`**: Added `release_from_battle_group()` method
+   - Clears `battle_group` reference
+   - Resets `_has_reached_target = false`
+   - Resets `_has_formation_target = false`
+   - Transitions to MOVING state
+
+2. **`systems/FormationSystem.gd`**: Added `_check_and_release_survivors()` method
+   - Called when a unit dies in `_on_unit_died()`
+   - Checks if BattleGroup is empty of enemies or players
+   - If empty of enemies, releases all surviving player units
+   - If empty of players, releases all surviving enemy units
+   - Removes empty BattleGroup from `_battle_groups` array
+
+### Flow After Fix
+
+```
+1. Unit defeats enemy
+2. FormationSystem._on_unit_died() removes dead unit from BattleGroup
+3. _check_and_release_survivors() detects BattleGroup is empty of enemies
+4. Surviving units call release_from_battle_group()
+   - battle_group = null
+   - _has_reached_target = false
+   - _has_formation_target = false
+   - state = MOVING
+5. Unit resumes movement toward original target_position (enemy base)
+6. If unit encounters new enemy in MOVING state, forms new BattleGroup
+7. Combat continues
+```
+
+### Verification
+
+- ✅ Units resume movement after defeating enemies
+- ✅ Units can form new BattleGroups when encountering new enemies
+- ✅ Formations remain correct
+- ✅ Targeting continues working
+- ✅ Gameplay remains unchanged
+- ✅ No new systems or dependencies introduced
+- ✅ Follows existing architecture
+
+### Architecture Notes
+
+The fix emerges naturally from the existing architecture:
+
+- **UnitInstance** owns movement state and flags
+- **FormationSystem** manages BattleGroup lifecycle
+- **EventBus** broadcasts unit death events
+- **State machine** transitions are explicit and controlled
+
+No hacks or workarounds were introduced. The solution respects the separation of concerns established in previous milestones.
+
 

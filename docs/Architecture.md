@@ -112,8 +112,11 @@ State transition methods:
 - `set_attacking()`: any → ATTACKING
 - `set_blocked()`: ATTACKING → BLOCKED
 - `set_moving()`: ATTACKING or BLOCKED → MOVING (when no valid target exists)
+- `release_from_battle_group()`: any → MOVING (when BattleGroup is empty of enemies)
 
 The `set_moving()` transition ensures units resume advancement when their target dies and no new target is available.
+
+The `release_from_battle_group()` method is called by FormationSystem when a BattleGroup becomes empty of enemies. It clears the battle_group reference, resets movement flags (`_has_reached_target`, `_has_formation_target`), and transitions the unit to MOVING state so it can continue toward its original target position.
 
 ### Models Layer
 

@@ -65,6 +65,13 @@ func set_moving() -> void:
 		_set_state(UnitState.State.MOVING)
 
 
+func release_from_battle_group() -> void:
+	battle_group = null
+	_has_reached_target = false
+	_has_formation_target = false
+	_set_state(UnitState.State.MOVING)
+
+
 func is_alive() -> bool:
 	return current_hp > 0
 

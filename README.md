@@ -113,7 +113,7 @@ Runtime game objects.
 | `BattleGroup` | RefCounted | Maintains ordered player/enemy formations. Provides frontline lookup. |
 | `UnitVisualComponent` | Node | Handles all visual building and updates (HP bar, labels, target display). |
 
-**UnitInstance State Machine:** Units transition through states: MOVING → BLOCKED → ATTACKING → MOVING. When a target dies and no new target is available, units automatically resume movement via `set_moving()`.
+**UnitInstance State Machine:** Units transition through states: MOVING → BLOCKED → ATTACKING → MOVING. When a target dies and no new target is available, units automatically resume movement via `set_moving()`. When a BattleGroup becomes empty of enemies, surviving units are released via `release_from_battle_group()`, which resets movement flags and allows them to continue toward their original destination.
 
 ### Definitions
 

@@ -29,7 +29,43 @@ func _on_unit_died(unit: UnitInstance) -> void:
 		group.cleanup()
 		if was_frontline:
 			EventBus.frontline_changed.emit(group)
+		_check_and_release_survivors(group)
 	unit.queue_free()
+
+
+func _check_and_release_survivors(group: BattleGroup) -> void:
+	var player_units: Array[UnitInstance] = group.player_formation
+	var enemy_units: Array[UnitInstance] = group.enemy_formation
+
+	var has_player: bool = false
+	for unit in player_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			has_player = true
+			break
+
+	var has_enemy: bool = false
+	for unit in enemy_units:
+		if is_instance_valid(unit) and unit.is_alive():
+			has_enemy = true
+			break
+
+	if not has_player and not has_enemy:
+		_battle_groups.erase(group)
+		return
+
+	if not has_enemy:
+		for unit in player_units:
+			if is_instance_valid(unit) and unit.is_alive():
+				unit.release_from_battle_group()
+		_battle_groups.erase(group)
+		return
+
+	if not has_player:
+		for unit in enemy_units:
+			if is_instance_valid(unit) and unit.is_alive():
+				unit.release_from_battle_group()
+		_battle_groups.erase(group)
+		return
 
 
 func _was_frontline(unit: UnitInstance, group: BattleGroup) -> bool:
