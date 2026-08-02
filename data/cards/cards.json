@@ -240,6 +240,261 @@
                 "attack_speed": 0.7,
                 "attack_model": "none"
             }
+        },
+        {
+            "id": "mammoth_hunter_001",
+            "name": "Mammoth Hunter",
+            "era": "prehistoric",
+            "image": "res://assets/cards/mammoth_hunter.png",
+            "stats": {
+                "hp": 80,
+                "attack": 22,
+                "range": 3,
+                "speed": 55,
+                "cost": 3,
+                "attack_speed": 1.1,
+                "attack_model": "none"
+            }
+        },
+        {
+            "id": "cave_painter_001",
+            "name": "Cave Painter",
+            "era": "prehistoric",
+            "image": "res://assets/cards/cave_painter.png",
+            "stats": {
+                "hp": 55,
+                "attack": 12,
+                "range": 2,
+                "speed": 45,
+                "cost": 2,
+                "attack_speed": 0.9,
+                "attack_model": "none"
+            }
+        },
+        {
+            "id": "rock_thrower_001",
+            "name": "Rock Thrower",
+            "era": "prehistoric",
+            "image": "res://assets/cards/rock_thrower.png",
+            "stats": {
+                "hp": 100,
+                "attack": 28,
+                "range": 4,
+                "speed": 35,
+                "cost": 4,
+                "attack_speed": 0.8,
+                "attack_model": "none"
+            }
+        },
+        {
+            "id": "spartan_hoplite_001",
+            "name": "Spartan Hoplite",
+            "era": "ancient",
+            "image": "res://assets/cards/spartan_hoplite.png",
+            "stats": {
+                "hp": 140,
+                "attack": 26,
+                "range": 1,
+                "speed": 40,
+                "cost": 5,
+                "attack_speed": 1.0,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "egyptian_archer_001",
+            "name": "Egyptian Archer",
+            "era": "ancient",
+            "image": "res://assets/cards/egyptian_archer.png",
+            "stats": {
+                "hp": 70,
+                "attack": 24,
+                "range": 5,
+                "speed": 50,
+                "cost": 3,
+                "attack_speed": 1.2,
+                "attack_model": "none"
+            }
+        },
+        {
+            "id": "persian_immortal_001",
+            "name": "Persian Immortal",
+            "era": "ancient",
+            "image": "res://assets/cards/persian_immortal.png",
+            "stats": {
+                "hp": 115,
+                "attack": 28,
+                "range": 2,
+                "speed": 55,
+                "cost": 4,
+                "attack_speed": 1.3,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "celtic_warrior_001",
+            "name": "Celtic Warrior",
+            "era": "ancient",
+            "image": "res://assets/cards/celtic_warrior.png",
+            "stats": {
+                "hp": 85,
+                "attack": 24,
+                "range": 1,
+                "speed": 70,
+                "cost": 3,
+                "attack_speed": 1.5,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "english_longbowman_001",
+            "name": "English Longbowman",
+            "era": "medieval",
+            "image": "res://assets/cards/english_longbowman.png",
+            "stats": {
+                "hp": 65,
+                "attack": 26,
+                "range": 6,
+                "speed": 45,
+                "cost": 4,
+                "attack_speed": 0.8,
+                "attack_model": "none"
+            }
+        },
+        {
+            "id": "scottish_highlander_001",
+            "name": "Scottish Highlander",
+            "era": "medieval",
+            "image": "res://assets/cards/scottish_highlander.png",
+            "stats": {
+                "hp": 95,
+                "attack": 30,
+                "range": 1,
+                "speed": 65,
+                "cost": 4,
+                "attack_speed": 1.4,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "teutonic_knight_001",
+            "name": "Teutonic Knight",
+            "era": "medieval",
+            "image": "res://assets/cards/teutonic_knight.png",
+            "stats": {
+                "hp": 145,
+                "attack": 30,
+                "range": 1,
+                "speed": 35,
+                "cost": 5,
+                "attack_speed": 0.8,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "ashigaru_001",
+            "name": "Ashigaru Foot Soldier",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/ashigaru.png",
+            "stats": {
+                "hp": 75,
+                "attack": 18,
+                "range": 1,
+                "speed": 55,
+                "cost": 2,
+                "attack_speed": 1.2,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "onna_musha_001",
+            "name": "Onna-musha",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/onna_musha.png",
+            "stats": {
+                "hp": 90,
+                "attack": 28,
+                "range": 2,
+                "speed": 65,
+                "cost": 4,
+                "attack_speed": 1.4,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "sohei_monk_001",
+            "name": "Sohei Warrior Monk",
+            "era": "feudal_japan",
+            "image": "res://assets/cards/sohei_monk.png",
+            "stats": {
+                "hp": 100,
+                "attack": 24,
+                "range": 1,
+                "speed": 50,
+                "cost": 4,
+                "attack_speed": 1.1,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "spanish_conquistador_001",
+            "name": "Spanish Conquistador",
+            "era": "renaissance",
+            "image": "res://assets/cards/spanish_conquistador.png",
+            "stats": {
+                "hp": 110,
+                "attack": 30,
+                "range": 1,
+                "speed": 55,
+                "cost": 4,
+                "attack_speed": 1.2,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "swiss_halberdier_001",
+            "name": "Swiss Halberdier",
+            "era": "renaissance",
+            "image": "res://assets/cards/swiss_halberdier.png",
+            "stats": {
+                "hp": 125,
+                "attack": 28,
+                "range": 2,
+                "speed": 40,
+                "cost": 4,
+                "attack_speed": 0.9,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "landsknecht_001",
+            "name": "Landsknecht",
+            "era": "renaissance",
+            "image": "res://assets/cards/landsknecht.png",
+            "stats": {
+                "hp": 100,
+                "attack": 26,
+                "range": 1,
+                "speed": 55,
+                "cost": 3,
+                "attack_speed": 1.3,
+                "attack_model": "melee"
+            }
+        },
+        {
+            "id": "venetian_admiral_001",
+            "name": "Venetian Admiral",
+            "era": "renaissance",
+            "image": "res://assets/cards/venetian_admiral.png",
+            "stats": {
+                "hp": 95,
+                "attack": 22,
+                "range": 4,
+                "speed": 50,
+                "cost": 4,
+                "attack_speed": 0.8,
+                "attack_model": "none"
+            }
         }
     ]
 }
