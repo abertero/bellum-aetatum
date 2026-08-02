@@ -55,7 +55,7 @@ func _process_unit_combat(unit: UnitInstance, delta: float) -> void:
 		unit.set_attacking()
 		_update_attack_timer(unit, target, delta)
 	else:
-		unit.set_blocked()
+		unit.set_moving()
 
 
 func _update_attack_timer(attacker: UnitInstance, target: UnitInstance, delta: float) -> void:

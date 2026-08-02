@@ -60,6 +60,11 @@ func set_blocked() -> void:
 		_set_state(UnitState.State.BLOCKED)
 
 
+func set_moving() -> void:
+	if current_state == UnitState.State.ATTACKING or current_state == UnitState.State.BLOCKED:
+		_set_state(UnitState.State.MOVING)
+
+
 func is_alive() -> bool:
 	return current_hp > 0
 

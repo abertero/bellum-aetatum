@@ -92,6 +92,29 @@ Runtime game objects that exist in the scene tree.
 - **BattleGroup**: Organizes units into ordered player/enemy formations. Provides frontline lookup.
 - **UnitVisualComponent**: Handles all visual building and updates (HP bar, labels, target display).
 
+#### UnitInstance State Transitions
+
+UnitInstance uses a state machine with the following states and transitions:
+
+```
+MOVING: Unit is advancing toward target position
+  ↓ (collision detected or target acquired)
+BLOCKED: Unit is waiting in formation
+  ↓ (target assigned by TargetingSystem)
+ATTACKING: Unit is engaged in combat
+  ↓ (target dies or becomes invalid)
+MOVING: Unit resumes advancement
+```
+
+State transition methods:
+- `set_battle_group()`: MOVING → BLOCKED
+- `set_formation_target()`: BLOCKED → WAITING
+- `set_attacking()`: any → ATTACKING
+- `set_blocked()`: ATTACKING → BLOCKED
+- `set_moving()`: ATTACKING or BLOCKED → MOVING (when no valid target exists)
+
+The `set_moving()` transition ensures units resume advancement when their target dies and no new target is available.
+
 ### Models Layer
 
 Attack model abstraction and registry.
@@ -247,6 +270,9 @@ CombatSystem         --[action_performed]----> (future listeners)
 13. EventBus.action_performed emitted with DamageAction
 14. UnitInstance dies -> EventBus.unit_died emitted
 15. FormationSystem removes unit and frees node
+16. Surviving unit's target is now null
+17. CombatSystem detects no valid target, transitions unit to MOVING state
+18. Unit resumes movement toward original target position
 ```
 
 ### BattleGroup Lifecycle

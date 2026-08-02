@@ -111,7 +111,9 @@ Runtime game objects.
 |---|---|---|
 | `UnitInstance` | Node2D | Represents one spawned unit on the battlefield. Owns state, movement, and HP. |
 | `BattleGroup` | RefCounted | Maintains ordered player/enemy formations. Provides frontline lookup. |
-| `UnitVisualComponent` | Node | Handles visual building and updates (HP bar, labels, target display). |
+| `UnitVisualComponent` | Node | Handles all visual building and updates (HP bar, labels, target display). |
+
+**UnitInstance State Machine:** Units transition through states: MOVING → BLOCKED → ATTACKING → MOVING. When a target dies and no new target is available, units automatically resume movement via `set_moving()`.
 
 ### Definitions
 
