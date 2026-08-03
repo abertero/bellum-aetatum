@@ -11,6 +11,7 @@ var speed: float = 0.0
 var cost: int = 0
 var attack_speed: float = 1.0
 var attack_model: String = ""
+var projectile_id: String = ""
 
 
 static func from_dictionary(data: Dictionary) -> UnitDefinition:
@@ -26,4 +27,5 @@ static func from_dictionary(data: Dictionary) -> UnitDefinition:
 	definition.cost = int(stats_data.get("cost", 0))
 	definition.attack_speed = float(stats_data.get("attack_speed", 1.0))
 	definition.attack_model = str(stats_data.get("attack_model", ""))
+	definition.projectile_id = str(stats_data.get("projectile_id", ""))
 	return definition

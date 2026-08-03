@@ -193,7 +193,8 @@
                 "speed": 80,
                 "cost": 4,
                 "attack_speed": 1.2,
-                "attack_model": "none"
+                "attack_model": "ranged",
+                "projectile_id": "arrow_basic"
             }
         },
         {
@@ -313,7 +314,8 @@
                 "speed": 50,
                 "cost": 3,
                 "attack_speed": 1.2,
-                "attack_model": "none"
+                "attack_model": "ranged",
+                "projectile_id": "arrow_basic"
             }
         },
         {
@@ -358,7 +360,8 @@
                 "speed": 45,
                 "cost": 4,
                 "attack_speed": 0.8,
-                "attack_model": "none"
+                "attack_model": "ranged",
+                "projectile_id": "arrow_basic"
             }
         },
         {

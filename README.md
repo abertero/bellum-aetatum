@@ -20,19 +20,20 @@ Everything in the game should be configurable without changing source code. The 
 res://
     scenes/              # Scene files (.tscn) and scene scripts
     core/                # Autoload singletons and core utilities (EventBus, JsonLoader, UnitState, SimulationContext)
-    entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent)
+    entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent, ProjectileInstance)
     commands/            # Command framework (GameCommand, PlayCardCommand, AttackCommand, CommandDispatcher)
-    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem, ProjectileSystem, CollisionSystem)
     actions/             # Action framework (GameAction, DamageAction)
     resources/           # Resource runtime state (ResourceInstance)
-    models/              # Attack models and registry (AttackModel, MeleeAttackModel, AttackModelRegistry)
-    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition)
-    factories/           # Object factories (UnitFactory)
+    models/              # Attack models and registry (AttackModel, MeleeAttackModel, RangedAttackModel, AttackModelRegistry, ProjectileDefinitionRegistry)
+    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition)
+    factories/           # Object factories (UnitFactory, ProjectileFactory)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
         stages/          # Stage configurations (stage_001.json)
         resources/       # Resource definitions (resources.json)
+        projectiles/     # Projectile definitions (projectiles.json)
     assets/
         cards/           # Card artwork (future)
     docs/
@@ -82,12 +83,14 @@ Game logic systems that orchestrate behavior.
 |---|---|---|
 | `SpawnSystem` | RefCounted | Instantiates UnitInstance scenes via UnitFactory. |
 | `FormationSystem` | Node | Detects collisions, manages battle groups and formations. |
-| `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only. |
-| `TargetingSystem` | Node | Assigns targets to melee units via SpatialQuerySystem. |
+| `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy, projectile collisions, units along path). Read-only. |
+| `TargetingSystem` | Node | Assigns targets to melee and ranged units via SpatialQuerySystem. |
 | `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Produces DamageAction. Emits attack events. |
-| `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. |
+| `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. Handles both melee and ranged combat. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
 | `EconomySystem` | Node | Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates. |
+| `ProjectileSystem` | Node | Manages projectile movement and lifecycle. Uses SimulationContext for time-based updates. Emits projectile events. |
+| `CollisionSystem` | Node | Detects projectile collisions with units. Produces DamageAction when collision occurs. Never modifies HP directly. |
 
 ### Models
 
@@ -97,7 +100,9 @@ Attack model abstraction and registry.
 |---|---|---|
 | `AttackModel` | RefCounted | Abstract base class defining the attack execution contract. Returns `DamageAction`. |
 | `MeleeAttackModel` | RefCounted | Calculates melee damage from attacker definition. Produces `DamageAction`. |
+| `RangedAttackModel` | RefCounted | Spawns projectile for ranged attacks. Returns `DamageAction` with 0 damage (actual damage applied later by CollisionSystem). |
 | `AttackModelRegistry` | RefCounted | Registers and resolves attack models by identifier. |
+| `ProjectileDefinitionRegistry` | RefCounted | Registers and resolves projectile definitions by identifier. |
 
 ### Actions
 
@@ -125,6 +130,7 @@ Runtime game objects.
 | `UnitInstance` | Node2D | Represents one spawned unit on the battlefield. Owns state, movement, and HP. |
 | `BattleGroup` | RefCounted | Maintains ordered player/enemy formations. Provides frontline lookup. |
 | `UnitVisualComponent` | Node | Handles all visual building and updates (HP bar, labels, target display). |
+| `ProjectileInstance` | Node2D | Represents a projectile in flight. Owns position, direction, speed, owner, target, remaining_distance. Handles movement and collision detection. Supports optional debug rendering. |
 
 **UnitInstance State Machine:** Units transition through states: MOVING → BLOCKED → ATTACKING → MOVING. When a target dies and no new target is available, units automatically resume movement via `set_moving()`. When a BattleGroup becomes empty of enemies, surviving units are released via `release_from_battle_group()`, which resets movement flags and allows them to continue toward their original destination.
 
@@ -134,10 +140,11 @@ Pure data containers parsed from JSON.
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model). |
+| `UnitDefinition` | RefCounted | Stores unit data (hp, attack, range, speed, cost, attack_model, projectile_id). |
 | `StageDefinition` | RefCounted | Stores stage configuration (battlefield, spawn positions, formation spacing). |
 | `DeckDefinition` | RefCounted | Stores deck card IDs. |
 | `ResourceDefinition` | RefCounted | Stores resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from resources.json. |
+| `ProjectileDefinition` | RefCounted | Stores projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from projectiles.json. |
 
 ### Factories
 
@@ -146,6 +153,7 @@ Object creation.
 | Class | Type | Responsibility |
 |---|---|---|
 | `UnitFactory` | RefCounted | Creates UnitInstance from PackedScene and initializes with definition. |
+| `ProjectileFactory` | RefCounted | Creates ProjectileInstance and initializes with ProjectileDefinition. Supports optional debug mode. |
 
 ## EventBus
 
@@ -162,10 +170,14 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 | `target_changed(unit, target)` | TargetingSystem | (future) |
 | `attack_started(attacker, target)` | AttackSystem | (future) |
 | `attack_finished(action)` | AttackSystem | (future) |
-| `action_performed(action)` | CombatSystem | (future) |
+| `action_performed(action)` | CombatSystem, CollisionSystem | (future) |
 | `resource_changed(resource_id, current_value, maximum)` | EconomySystem | UI |
 | `resource_spent(resource_id, amount, remaining)` | EconomySystem | (future) |
 | `resource_generated(resource_id, amount, current_value)` | EconomySystem | (future) |
+| `projectile_spawned(projectile)` | ProjectileFactory | ProjectileSystem |
+| `projectile_moved(projectile)` | ProjectileSystem | (future) |
+| `projectile_collided(projectile, target)` | CollisionSystem | (future) |
+| `projectile_destroyed(projectile)` | ProjectileSystem, CollisionSystem | (future) |
 
 ## Gameplay Flow
 
@@ -219,10 +231,30 @@ CombatSystem._physics_process()
   -> CommandDispatcher.dispatch(command)
      -> AttackSystem.execute(attacker, target)
         -> AttackModelRegistry.resolve(attack_model)
-        -> MeleeAttackModel.execute() -> DamageAction
+        -> For melee: MeleeAttackModel.execute() -> DamageAction
+        -> For ranged: RangedAttackModel.execute()
+           -> Resolve ProjectileDefinition
+           -> ProjectileFactory.create_projectile()
+           -> EventBus.projectile_spawned emitted
+           -> Return DamageAction(0) (damage applied later)
         -> EventBus.attack_started / attack_finished emitted
   -> Consume DamageAction via target.take_damage()
   -> EventBus.action_performed emitted with DamageAction
+
+ProjectileSystem._physics_process()
+  -> Update all projectile positions using SimulationContext.delta_time
+  -> EventBus.projectile_moved emitted
+  -> Cleanup expired projectiles
+  -> EventBus.projectile_destroyed emitted
+
+CollisionSystem._physics_process()
+  -> Check projectile collisions with units
+  -> If collision detected:
+     -> EventBus.projectile_collided emitted
+     -> Create DamageAction with projectile damage
+     -> EventBus.action_performed emitted
+     -> CombatSystem consumes DamageAction, applies HP
+     -> EventBus.projectile_destroyed emitted
 
 Unit dies
   -> EventBus.unit_died emitted
@@ -245,17 +277,16 @@ Unit dies
 - [x] **Milestone 7** - Action Framework: GameAction base class, DamageAction, action pipeline, EventBus action broadcast
 - [x] **Milestone 8** - Command Framework: GameCommand base class, PlayCardCommand, AttackCommand, CommandDispatcher
 - [x] **Milestone 9** - Economy Layer: EconomySystem, ResourceDefinition, ResourceInstance, SimulationContext, command validation, resource regeneration
+- [x] **Milestone 10** - Projectile Layer: ProjectileDefinition, ProjectileInstance, ProjectileFactory, ProjectileSystem, CollisionSystem, RangedAttackModel, projectile collision detection
 
 ### Planned
 
-- [ ] **Milestone 10** - Ranged attacks: RangedAttackModel, range-based targeting
-- [ ] **Milestone 11** - Projectiles: projectile entities, travel time, visual feedback
-- [ ] **Milestone 12** - Abilities and passives: ability system, trigger conditions
-- [ ] **Milestone 13** - Status effects: buffs, debuffs, duration, stacking
-- [ ] **Milestone 14** - Victory conditions: base destruction, win/lose detection
-- [ ] **Milestone 15** - Animations and visual effects
-- [ ] **Milestone 16** - Audio: sound effects, music
-- [ ] **Milestone 17** - Menus, settings, save system
+- [ ] **Milestone 11** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 12** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 13** - Victory conditions: base destruction, win/lose detection
+- [ ] **Milestone 14** - Animations and visual effects
+- [ ] **Milestone 15** - Audio: sound effects, music
+- [ ] **Milestone 16** - Menus, settings, save system
 
 ## Architecture Rules
 

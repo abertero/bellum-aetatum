@@ -81,3 +81,42 @@ func _get_formation_by_owner(group: BattleGroup, owner: String) -> Array[UnitIns
 	if owner == "enemy":
 		return group.enemy_formation
 	return []
+
+
+func get_projectile_collisions(projectile: ProjectileInstance) -> Array[UnitInstance]:
+	var result: Array[UnitInstance] = []
+	var collision_radius: float = 8.0
+	var enemy_owner: String = "enemy" if projectile.owner_unit.unit_owner == "player" else "player"
+	
+	for unit in get_units_by_owner(enemy_owner):
+		if not is_instance_valid(unit) or not unit.is_alive():
+			continue
+		var distance: float = projectile.position.distance_to(unit.position)
+		if distance <= collision_radius:
+			result.append(unit)
+	
+	return result
+
+
+func get_units_along_path(start: Vector2, end: Vector2, width: float = 8.0) -> Array[UnitInstance]:
+	var result: Array[UnitInstance] = []
+	var path_direction: Vector2 = (end - start).normalized()
+	var path_length: float = start.distance_to(end)
+	
+	for unit in _formation_system.get_all_units():
+		if not is_instance_valid(unit) or not unit.is_alive():
+			continue
+		
+		var to_unit: Vector2 = unit.position - start
+		var projection: float = to_unit.dot(path_direction)
+		
+		if projection < 0 or projection > path_length:
+			continue
+		
+		var closest_point: Vector2 = start + path_direction * projection
+		var distance: float = unit.position.distance_to(closest_point)
+		
+		if distance <= width:
+			result.append(unit)
+	
+	return result

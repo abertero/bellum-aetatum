@@ -16,7 +16,7 @@ func _physics_process(_delta: float) -> void:
 func _assign_targets_for_team(team: String) -> void:
 	var formation: Array[UnitInstance] = _spatial_query.get_units_in_formation(team)
 	for unit in formation:
-		if not unit.is_melee():
+		if not unit.is_melee() and not unit.is_ranged():
 			continue
 		var target: UnitInstance = _spatial_query.get_frontline(unit)
 		_assign_target(unit, target)

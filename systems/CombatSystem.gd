@@ -41,15 +41,30 @@ func _process_all_units(delta: float) -> void:
 	for unit in units:
 		if not is_instance_valid(unit) or not unit.is_alive():
 			continue
-		if unit.battle_group == null:
+		if unit.is_melee() and unit.battle_group == null:
 			continue
 		_process_unit_combat(unit, delta)
 
 
 func _process_unit_combat(unit: UnitInstance, delta: float) -> void:
-	if not unit.is_melee():
+	if unit.is_melee():
+		_process_melee_combat(unit, delta)
+	elif unit.is_ranged():
+		_process_ranged_combat(unit, delta)
+	else:
 		unit.set_blocked()
-		return
+
+
+func _process_melee_combat(unit: UnitInstance, delta: float) -> void:
+	var target: UnitInstance = unit.get_current_target()
+	if target != null and target.is_alive():
+		unit.set_attacking()
+		_update_attack_timer(unit, target, delta)
+	else:
+		unit.set_moving()
+
+
+func _process_ranged_combat(unit: UnitInstance, delta: float) -> void:
 	var target: UnitInstance = unit.get_current_target()
 	if target != null and target.is_alive():
 		unit.set_attacking()
@@ -74,6 +89,8 @@ func _apply_damage_action(action: DamageAction) -> void:
 	if action.target == null or not is_instance_valid(action.target):
 		return
 	if not action.target.is_alive():
+		return
+	if action.damage <= 0:
 		return
 	action.target.take_damage(action.damage)
 	EventBus.action_performed.emit(action)

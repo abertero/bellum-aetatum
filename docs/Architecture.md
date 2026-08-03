@@ -21,7 +21,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                        Systems Layer                              |
 |  SpawnSystem | FormationSystem | SpatialQuerySystem              |
 |  TargetingSystem | CombatSystem | AttackSystem | DeckSystem      |
-|  EconomySystem                                                    |
+|  EconomySystem | ProjectileSystem | CollisionSystem              |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -34,12 +34,14 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                        Models Layer                               |
 |  AttackModelRegistry | AttackModel | MeleeAttackModel            |
+|  RangedAttackModel | ProjectileDefinitionRegistry                |
 +------------------------------------------------------------------+
          |              |
          v              v
 +------------------------------------------------------------------+
 |                       Entities Layer                              |
 |  UnitInstance | BattleGroup | UnitVisualComponent                |
+|  ProjectileInstance                                               |
 +------------------------------------------------------------------+
          |              |
          v              v
@@ -52,7 +54,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
-|  ResourceDefinition                                               |
+|  ResourceDefinition | ProjectileDefinition                        |
 +------------------------------------------------------------------+
          |
          v
@@ -64,14 +66,14 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          v
 +------------------------------------------------------------------+
 |                       Factories Layer                             |
-|  UnitFactory                                                      |
+|  UnitFactory | ProjectileFactory                                  |
 +------------------------------------------------------------------+
          |
          v
 +------------------------------------------------------------------+
 |                         Data Layer                                |
 |  cards.json | player_deck.json | enemy_deck.json | stage_001.json|
-|  resources.json                                                   |
+|  resources.json | projectiles.json                                |
 +------------------------------------------------------------------+
 ```
 
@@ -90,10 +92,11 @@ Autoloaded singletons and infrastructure services available globally.
 
 Pure data containers that hold configuration parsed from JSON. No behavior, no mutable gameplay state.
 
-- **UnitDefinition**: Unit statistics (hp, attack, range, speed, cost, attack_speed, attack_model).
+- **UnitDefinition**: Unit statistics (hp, attack, range, speed, cost, attack_speed, attack_model, projectile_id).
 - **StageDefinition**: Stage configuration (battlefield_width, spawn positions, formation_spacing).
 - **DeckDefinition**: Deck card ID list.
 - **ResourceDefinition**: Resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from `data/resources/resources.json`.
+- **ProjectileDefinition**: Projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from `data/projectiles/projectiles.json`.
 
 ### Entities Layer
 
@@ -102,6 +105,7 @@ Runtime game objects that exist in the scene tree.
 - **UnitInstance**: Represents one spawned unit. Owns mutable state (current_hp, current_state, current_target, battle_group). Delegates visuals to UnitVisualComponent.
 - **BattleGroup**: Organizes units into ordered player/enemy formations. Provides frontline lookup.
 - **UnitVisualComponent**: Handles all visual building and updates (HP bar, labels, target display).
+- **ProjectileInstance**: Represents a projectile in flight. Owns position, direction, speed, owner, target, remaining_distance. Handles movement and collision detection. Supports optional debug rendering.
 
 #### UnitInstance State Transitions
 
@@ -141,7 +145,9 @@ Attack model abstraction and registry.
 
 - **AttackModel**: Abstract base class defining the `execute(attacker, target) -> DamageAction` contract.
 - **MeleeAttackModel**: Implements melee damage calculation, produces `DamageAction`.
+- **RangedAttackModel**: Implements ranged attack by spawning a projectile. Returns a `DamageAction` with 0 damage (actual damage applied later by CollisionSystem).
 - **AttackModelRegistry**: Registers and resolves attack models by string identifier.
+- **ProjectileDefinitionRegistry**: Registers and resolves projectile definitions by string identifier.
 
 ### Actions Layer
 
@@ -165,18 +171,21 @@ Game logic systems that orchestrate behavior.
 
 - **SpawnSystem**: Creates UnitInstance via UnitFactory. Emits `unit_spawned`.
 - **FormationSystem**: Detects collisions, creates BattleGroups, manages formation positioning.
-- **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy). Read-only — never modifies state.
-- **TargetingSystem**: Assigns targets to melee units based on SpatialQuerySystem queries.
+- **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy, projectile collisions, units along path). Read-only — never modifies state.
+- **TargetingSystem**: Assigns targets to melee and ranged units based on SpatialQuerySystem queries.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus.
+- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus. Handles both melee and ranged combat.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 - **EconomySystem**: Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates.
+- **ProjectileSystem**: Manages projectile movement and lifecycle. Uses SimulationContext for time-based updates. Emits `projectile_spawned`, `projectile_moved`, `projectile_destroyed`.
+- **CollisionSystem**: Detects projectile collisions with units. Produces `DamageAction` when collision occurs. Emits `projectile_collided`. Never modifies HP directly.
 
 ### Factories Layer
 
 Object creation logic.
 
 - **UnitFactory**: Creates UnitInstance from PackedScene and initializes with UnitDefinition.
+- **ProjectileFactory**: Creates ProjectileInstance and initializes with ProjectileDefinition. Supports optional debug mode.
 
 ### Scenes Layer
 
@@ -251,6 +260,10 @@ TargetingSystem      --[target_changed]------> (future listeners)
 AttackSystem         --[attack_started]------> (future listeners)
 AttackSystem         --[attack_finished]-----> (future listeners)
 CombatSystem         --[action_performed]----> (future listeners)
+ProjectileFactory    --[projectile_spawned]--> ProjectileSystem
+ProjectileSystem     --[projectile_moved]----> (future listeners)
+CollisionSystem      --[projectile_collided]-> (future listeners)
+ProjectileSystem     --[projectile_destroyed]> (future listeners)
 ```
 
 ### Rules
@@ -310,44 +323,6 @@ CombatSystem         --[action_performed]----> (future listeners)
 
 ## Runtime Flow
 
-### Per-Frame Update Order
-
-```
-_physics_process(delta):
-  1. BattleScene._physics_process()
-     -> _update_enemy_spawn_timer()
-        -> PlayCardCommand -> CommandDispatcher -> SpawnSystem
-     -> _update_debug_panel()
-
-  2. FormationSystem._physics_process()
-     -> _cleanup_invalid_units()
-     -> _detect_collisions()
-     -> _update_formations()
-
-  3. TargetingSystem._physics_process()
-     -> _assign_targets_for_team() for each team
-        -> SpatialQuerySystem.get_units_in_formation()
-        -> SpatialQuerySystem.get_frontline()
-
-  4. CombatSystem._physics_process()
-     -> _cleanup_timers()
-     -> _cleanup_tracked_units()
-     -> _process_all_units()
-        -> _process_unit_combat() for each unit with target
-           -> _update_attack_timer()
-              -> AttackCommand -> CommandDispatcher
-                 -> AttackSystem.execute()
-                    -> AttackModelRegistry.resolve()
-                    -> MeleeAttackModel.execute() -> DamageAction
-              -> _apply_damage_action()
-                 -> target.take_damage()
-                 -> EventBus.action_performed.emit(action)
-
-  5. UnitInstance._physics_process() (each unit)
-     -> _validate_target()
-     -> State machine processing
-```
-
 ### Command Execution Flow
 
 ```
@@ -375,9 +350,117 @@ CombatSystem._update_attack_timer()
            -> AttackModelRegistry.resolve(model_key)
            -> model.execute(attacker, target)
               -> MeleeAttackModel: DamageAction.create(attacker.definition.attack, attacker, target)
+              -> RangedAttackModel: 
+                 1. Resolve ProjectileDefinition from attacker.definition.projectile_id
+                 2. ProjectileFactory.create_projectile() -> ProjectileInstance
+                 3. EventBus.projectile_spawned.emit(projectile)
+                 4. Return DamageAction.create(0, attacker, target) (damage applied later by CollisionSystem)
         -> EventBus.attack_finished.emit(action)
   -> CombatSystem._apply_damage_action(action)
-     -> target.take_damage(action.damage)
-        -> if not alive: EventBus.unit_died.emit(target)
+     -> For melee: target.take_damage(action.damage)
+     -> For ranged: action.damage is 0, no immediate damage
      -> EventBus.action_performed.emit(action)
+```
+
+### Projectile Lifecycle
+
+```
+1. Ranged unit's attack timer expires
+2. CombatSystem creates AttackCommand
+3. CommandDispatcher.dispatch(command)
+4. AttackSystem.execute() calls RangedAttackModel.execute()
+5. RangedAttackModel resolves ProjectileDefinition
+6. ProjectileFactory.create_projectile()
+   a. Create ProjectileInstance
+   b. Initialize with position, direction, speed, owner, target
+   c. EventBus.projectile_spawned emitted
+7. ProjectileSystem registers projectile
+8. ProjectileSystem._physics_process() runs each frame
+   a. Update projectile movement using SimulationContext.delta_time
+   b. EventBus.projectile_moved emitted
+   c. Check if projectile has reached target or expired
+9. CollisionSystem._physics_process() runs each frame
+   a. Check projectile collisions with units
+   b. If collision detected:
+      i. EventBus.projectile_collided.emit(projectile, target)
+      ii. Create DamageAction with projectile damage
+      iii. EventBus.action_performed.emit(action)
+      iv. CombatSystem consumes DamageAction, applies HP
+      v. EventBus.projectile_destroyed.emit(projectile)
+      vi. Remove projectile from scene
+10. If projectile expires without collision:
+    a. EventBus.projectile_destroyed.emit(projectile)
+    b. Remove projectile from scene
+```
+
+### Per-Frame Update Order
+
+```
+_physics_process(delta):
+  1. BattleScene._physics_process()
+     -> SimulationContext.update(delta)
+     -> _update_enemy_spawn_timer()
+        -> PlayCardCommand -> CommandDispatcher -> SpawnSystem
+     -> _update_debug_panel()
+     -> _update_resource_panel()
+     -> _update_card_affordability()
+
+  2. FormationSystem._physics_process()
+     -> _cleanup_invalid_units()
+     -> _detect_collisions()
+     -> _update_formations()
+
+  3. TargetingSystem._physics_process()
+     -> _assign_targets_for_team() for each team
+        -> SpatialQuerySystem.get_units_in_formation()
+        -> SpatialQuerySystem.get_frontline()
+
+  4. CombatSystem._physics_process()
+     -> _cleanup_timers()
+     -> _cleanup_tracked_units()
+     -> _process_all_units()
+        -> _process_unit_combat() for each unit with target
+           -> For melee units:
+              -> _update_attack_timer()
+                 -> AttackCommand -> CommandDispatcher
+                    -> AttackSystem.execute()
+                       -> AttackModelRegistry.resolve()
+                       -> MeleeAttackModel.execute() -> DamageAction
+                 -> _apply_damage_action()
+                    -> target.take_damage()
+                    -> EventBus.action_performed.emit(action)
+           -> For ranged units:
+              -> _update_attack_timer()
+                 -> AttackCommand -> CommandDispatcher
+                    -> AttackSystem.execute()
+                       -> AttackModelRegistry.resolve()
+                       -> RangedAttackModel.execute() -> DamageAction(0)
+                          -> ProjectileFactory.create_projectile()
+                 -> _apply_damage_action()
+                    -> action.damage is 0, no immediate damage
+
+  5. ProjectileSystem._physics_process()
+     -> _update_all_projectiles()
+        -> For each projectile:
+           -> projectile.update_movement(SimulationContext.delta_time)
+           -> EventBus.projectile_moved.emit(projectile)
+     -> _cleanup_expired_projectiles()
+        -> Remove expired projectiles
+        -> EventBus.projectile_destroyed.emit(projectile)
+
+  6. CollisionSystem._physics_process()
+     -> _check_projectile_collisions()
+        -> For each projectile:
+           -> If projectile.has_reached_target():
+              -> _handle_projectile_collision(projectile)
+                 -> Create DamageAction
+                 -> EventBus.action_performed.emit(action)
+                 -> EventBus.projectile_destroyed.emit(projectile)
+
+  7. EconomySystem._physics_process()
+     -> Regenerate resources using SimulationContext.delta_time
+
+  8. UnitInstance._physics_process() (each unit)
+     -> _validate_target()
+     -> State machine processing
 ```

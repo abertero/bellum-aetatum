@@ -1650,4 +1650,273 @@ EconomySystem._physics_process()
 - Command validation can be extended for new command types.
 - Resource events can be consumed by UI, analytics, achievements.
 
+---
+
+## Milestone 10 — Projectile Layer
+
+### Objective
+
+Introduce a Projectile Layer that enables ranged combat. Projectiles become first-class runtime entities that travel over time and apply damage on collision. The architecture must maintain the principle that CombatSystem is the only system that modifies HP, and all damage must flow through the Action Framework.
+
+### What Was Implemented
+
+#### 1. ProjectileDefinition
+
+- New `ProjectileDefinition` class (`definitions/ProjectileDefinition.gd`), extends `RefCounted`.
+- Pure data container for projectile properties.
+- Fields: `id`, `display_name`, `speed`, `max_range`, `damage`, `projectile_type`, `image`.
+- Loaded from `data/projectiles/projectiles.json`.
+- Immutable after creation.
+
+#### 2. ProjectileInstance
+
+- New `ProjectileInstance` class (`entities/ProjectileInstance.gd`), extends `Node2D`.
+- Runtime entity representing a projectile in flight.
+- Fields: `id`, `direction`, `speed`, `owner_unit`, `target_unit`, `remaining_distance`, `projectile_type`, `metadata`, `debug_mode`.
+- Handles movement and collision detection.
+- Supports optional debug rendering (ID, speed, remaining distance, target).
+- Provides API: `initialize()`, `update_movement()`, `has_reached_target()`, `is_expired()`, `get_metadata()`.
+
+#### 3. ProjectileFactory
+
+- New `ProjectileFactory` class (`factories/ProjectileFactory.gd`), extends `RefCounted`.
+- Static factory for creating ProjectileInstance.
+- Supports optional debug mode via static `debug_mode` flag.
+- Creates projectile with position, direction, speed, owner, target, max_range, projectile_type, image, metadata.
+- Emits `EventBus.projectile_spawned` after creation.
+
+#### 4. ProjectileSystem
+
+- New `ProjectileSystem` class (`systems/ProjectileSystem.gd`), extends `Node`.
+- Manages projectile movement and lifecycle.
+- Uses SimulationContext for time-based updates.
+- Listens to `EventBus.projectile_spawned` to track active projectiles.
+- Provides API: `get_active_projectiles()`, `get_projectile_count()`.
+- Emits `EventBus.projectile_moved` and `EventBus.projectile_destroyed`.
+
+#### 5. CollisionSystem
+
+- New `CollisionSystem` class (`systems/CollisionSystem.gd`), extends `Node`.
+- Detects projectile collisions with units.
+- Produces DamageAction when collision occurs.
+- Never modifies HP directly (maintains architectural principle).
+- Emits `EventBus.projectile_collided` and `EventBus.projectile_destroyed`.
+
+#### 6. RangedAttackModel
+
+- New `RangedAttackModel` class (`models/RangedAttackModel.gd`), extends `AttackModel`.
+- Resolves ProjectileDefinition from attacker's `projectile_id`.
+- Spawns projectile via ProjectileFactory.
+- Returns DamageAction with 0 damage (actual damage applied later by CollisionSystem).
+- Requires initialization with ProjectileDefinitionRegistry and parent node.
+
+#### 7. ProjectileDefinitionRegistry
+
+- New `ProjectileDefinitionRegistry` class (`models/ProjectileDefinitionRegistry.gd`), extends `RefCounted`.
+- Registers and resolves projectile definitions by string identifier.
+- Provides API: `register()`, `resolve()`, `get_all_ids()`.
+
+#### 8. SpatialQuerySystem Extensions
+
+- Extended `SpatialQuerySystem` with projectile-related queries.
+- New methods:
+  - `get_projectile_collisions(projectile) -> Array[UnitInstance]`: Returns units within collision radius of projectile.
+  - `get_units_along_path(start, end, width) -> Array[UnitInstance]`: Returns units along a path (for future piercing/chain attacks).
+
+#### 9. EventBus Updates
+
+- Added projectile-related signals:
+  - `projectile_spawned(projectile: ProjectileInstance)`
+  - `projectile_moved(projectile: ProjectileInstance)`
+  - `projectile_collided(projectile: ProjectileInstance, target: UnitInstance)`
+  - `projectile_destroyed(projectile: ProjectileInstance)`
+
+#### 10. UnitDefinition Update
+
+- Added `projectile_id: String` field to UnitDefinition.
+- Parsed from `stats.projectile_id` in card JSON.
+- Ranged units reference their projectile definition via this field.
+
+#### 11. UnitInstance Update
+
+- Added `is_ranged() -> bool` method.
+- Returns true if `definition.attack_model == "ranged"`.
+
+#### 12. TargetingSystem Update
+
+- Updated to assign targets to both melee and ranged units.
+- Previously only assigned targets to melee units.
+
+#### 13. CombatSystem Update
+
+- Updated to handle both melee and ranged combat.
+- New methods:
+  - `_process_melee_combat(unit, delta)`: Handles melee combat logic.
+  - `_process_ranged_combat(unit, delta)`: Handles ranged combat logic.
+- Updated `_process_all_units()` to process ranged units even if not in battle group.
+- Updated `_apply_damage_action()` to skip actions with 0 damage (ranged attacks).
+
+#### 14. BattleScene Update
+
+- Added projectile system setup:
+  - `_setup_projectile_registry()`: Loads projectile definitions from JSON.
+  - `_setup_projectile_system()`: Creates and initializes ProjectileSystem.
+  - `_setup_collision_system()`: Creates and initializes CollisionSystem.
+- Updated `_setup_attack_system()` to register RangedAttackModel with ProjectileDefinitionRegistry.
+- Updated `_ready()` to call new setup methods in correct order.
+
+#### 15. Data Configuration
+
+- Created `data/projectiles/projectiles.json` with arrow_basic projectile definition.
+- Updated `data/cards/cards.json` with ranged units:
+  - egyptian_archer_001 (attack_model: "ranged", projectile_id: "arrow_basic")
+  - english_longbowman_001 (attack_model: "ranged", projectile_id: "arrow_basic")
+  - mongol_archer_001 (attack_model: "ranged", projectile_id: "arrow_basic")
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `definitions/ProjectileDefinition.gd` | 19 | Pure data container for projectile properties |
+| `entities/ProjectileInstance.gd` | 79 | Runtime entity for projectile in flight |
+| `factories/ProjectileFactory.gd` | 33 | Static factory for creating projectiles |
+| `systems/ProjectileSystem.gd` | 42 | Manages projectile movement and lifecycle |
+| `systems/CollisionSystem.gd` | 45 | Detects projectile collisions, produces DamageAction |
+| `models/RangedAttackModel.gd` | 18 | Spawns projectile for ranged attacks |
+| `models/ProjectileDefinitionRegistry.gd` | 15 | Registers and resolves projectile definitions |
+| `data/projectiles/projectiles.json` | 11 | Projectile configuration |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +4 signals | Added projectile events |
+| `definitions/UnitDefinition.gd` | +2 lines | Added projectile_id field |
+| `entities/UnitInstance.gd` | +4 lines | Added is_ranged() method |
+| `systems/SpatialQuerySystem.gd` | +35 lines | Added projectile query methods |
+| `systems/TargetingSystem.gd` | +1/-1 lines | Updated to target ranged units |
+| `systems/CombatSystem.gd` | +20/-5 lines | Added ranged combat handling |
+| `scenes/battle_scene.gd` | +30 lines | Setup projectile systems |
+| `data/cards/cards.json` | +3 units | Added projectile_id to ranged units |
+
+### Ranged Attack Flow
+
+```
+1. Ranged unit's attack timer expires
+2. CombatSystem creates AttackCommand
+3. CommandDispatcher.dispatch(command)
+4. AttackSystem.execute() calls RangedAttackModel.execute()
+5. RangedAttackModel resolves ProjectileDefinition
+6. ProjectileFactory.create_projectile()
+   a. Create ProjectileInstance
+   b. Initialize with position, direction, speed, owner, target
+   c. EventBus.projectile_spawned emitted
+7. ProjectileSystem registers projectile
+8. ProjectileSystem._physics_process() runs each frame
+   a. Update projectile movement using SimulationContext.delta_time
+   b. EventBus.projectile_moved emitted
+   c. Check if projectile has reached target or expired
+9. CollisionSystem._physics_process() runs each frame
+   a. Check projectile collisions with units
+   b. If collision detected:
+      i. EventBus.projectile_collided.emit(projectile, target)
+      ii. Create DamageAction with projectile damage
+      iii. EventBus.action_performed.emit(action)
+      iv. CombatSystem consumes DamageAction, applies HP
+      v. EventBus.projectile_destroyed.emit(projectile)
+      vi. Remove projectile from scene
+10. If projectile expires without collision:
+    a. EventBus.projectile_destroyed.emit(projectile)
+    b. Remove projectile from scene
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **ProjectileDefinition**: Only stores projectile properties. No behavior.
+- **ProjectileInstance**: Only manages projectile state and movement. No damage application.
+- **ProjectileFactory**: Only creates projectiles. No game logic.
+- **ProjectileSystem**: Only manages projectile lifecycle. No collision detection.
+- **CollisionSystem**: Only detects collisions and produces DamageAction. No HP modification.
+- **RangedAttackModel**: Only spawns projectiles. No damage calculation.
+- **CombatSystem**: Remains the only system that modifies HP.
+
+#### Open/Closed Principle
+
+- New projectile types can be added via JSON without modifying code.
+- New projectile behaviors can be added by extending ProjectileInstance.
+- New collision detection strategies can be added to CollisionSystem.
+
+#### Dependency Inversion
+
+- Systems depend on `SimulationContext` abstraction, not engine clock.
+- CollisionSystem depends on `DamageAction` abstraction, not direct HP modification.
+- RangedAttackModel depends on `ProjectileDefinitionRegistry` abstraction.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each class has one responsibility (definition, instance, factory, system, collision) |
+| Open/Closed | New projectile types added via JSON, new behaviors via extension |
+| Liskov Substitution | RangedAttackModel can replace MeleeAttackModel in AttackModelRegistry |
+| Interface Segregation | Systems depend only on methods they use |
+| Dependency Inversion | Systems depend on abstractions (SimulationContext, DamageAction, Registry) |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All new classes are under 80 lines |
+| Functions under 30 lines | All functions are 1-15 lines |
+| Composition over inheritance | ProjectileInstance composed with ProjectileDefinition, systems composed with registries |
+| No duplicated logic | Collision detection centralized in CollisionSystem, movement in ProjectileSystem |
+| Dependencies point inward | Systems → ProjectileSystem → ProjectileInstance → ProjectileDefinition → SimulationContext |
+
+### Behavior Changes
+
+- Ranged units now spawn projectiles instead of applying immediate damage
+- Projectiles travel over time and collide with targets
+- Damage is applied when projectile collides with target
+- Ranged units can attack from a distance
+- Projectiles provide visual feedback for ranged attacks
+
+### Existing Gameplay Preserved
+
+- Melee combat unchanged
+- Unit spawning unchanged
+- Formation unchanged
+- Targeting unchanged (now includes ranged units)
+- Death unchanged
+- Movement unchanged
+- Economy unchanged
+- CombatSystem remains the only system that modifies HP
+
+### What Was NOT Implemented (Intentionally)
+
+- AOE (area of effect) projectiles
+- Explosion radius
+- Chain attacks (lightning that jumps between targets)
+- Status effects (projectiles that apply buffs/debuffs)
+- Abilities (special projectile-based abilities)
+- Legendary mechanics
+- Piercing (projectiles that pass through multiple targets)
+- Ricochet (projectiles that bounce)
+- Homing projectiles
+- Projectile physics (gravity, wind)
+- Projectile interception (dodging, blocking)
+- Additional projectile types (only arrow_basic implemented)
+
+### Extension Points for Future Milestones
+
+- `ProjectileDefinition` can be extended with new projectile types via JSON.
+- `ProjectileInstance` can support complex behaviors (homing, AOE, piercing, ricochet).
+- `CollisionSystem` can support advanced collision detection (shapes, physics).
+- `ProjectileSystem` can support object pooling for performance.
+- New projectile types can be added without modifying existing code.
+- Projectile events can be consumed by UI, analytics, achievements.
+- Debug rendering can be extended with more information.
+- Projectile physics can be added (gravity, wind, etc.).
+
 

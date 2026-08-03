@@ -80,6 +80,10 @@ func is_melee() -> bool:
 	return definition.attack_model == "melee"
 
 
+func is_ranged() -> bool:
+	return definition.attack_model == "ranged"
+
+
 func take_damage(amount: int) -> void:
 	current_hp = max(0, current_hp - amount)
 	_visual.update_hp_display(current_hp, definition.hp)

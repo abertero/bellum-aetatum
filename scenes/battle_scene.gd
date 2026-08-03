@@ -17,6 +17,9 @@ var _attack_system: AttackSystem
 var _combat_system: CombatSystem
 var _economy_system: EconomySystem
 var _command_dispatcher: CommandDispatcher
+var _projectile_registry: ProjectileDefinitionRegistry
+var _projectile_system: ProjectileSystem
+var _collision_system: CollisionSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
@@ -34,7 +37,10 @@ func _ready() -> void:
 	_setup_formation_system()
 	_setup_spatial_query_system()
 	_setup_targeting_system()
+	_setup_projectile_registry()
 	_setup_attack_system()
+	_setup_projectile_system()
+	_setup_collision_system()
 	_setup_economy_system()
 	_setup_command_dispatcher()
 	_setup_combat_system()
@@ -119,10 +125,40 @@ func _setup_targeting_system() -> void:
 	add_child(_targeting_system)
 
 
+func _setup_projectile_registry() -> void:
+	_projectile_registry = ProjectileDefinitionRegistry.new()
+	_load_projectile_definitions()
+
+
+func _load_projectile_definitions() -> void:
+	var data: Variant = JsonLoader.load_json("res://data/projectiles/projectiles.json")
+	if data == null or not data.has("projectiles"):
+		push_error("BattleScene: failed to load projectile definitions")
+		return
+	for projectile_data: Dictionary in data["projectiles"]:
+		var definition: ProjectileDefinition = ProjectileDefinition.from_dictionary(projectile_data)
+		_projectile_registry.register(definition.id, definition)
+
+
 func _setup_attack_system() -> void:
 	var registry := AttackModelRegistry.new()
 	registry.register("melee", MeleeAttackModel.new())
+	var ranged_model := RangedAttackModel.new()
+	ranged_model.initialize(_projectile_registry, _unit_container)
+	registry.register("ranged", ranged_model)
 	_attack_system = AttackSystem.new(registry)
+
+
+func _setup_projectile_system() -> void:
+	_projectile_system = ProjectileSystem.new()
+	_projectile_system.initialize(_simulation_context)
+	add_child(_projectile_system)
+
+
+func _setup_collision_system() -> void:
+	_collision_system = CollisionSystem.new()
+	_collision_system.initialize(_projectile_system)
+	add_child(_collision_system)
 
 
 func _setup_economy_system() -> void:

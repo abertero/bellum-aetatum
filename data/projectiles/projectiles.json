@@ -1,0 +1,13 @@
+{
+  "projectiles": [
+    {
+      "id": "arrow_basic",
+      "display_name": "Basic Arrow",
+      "speed": 300.0,
+      "max_range": 400.0,
+      "damage": 15,
+      "projectile_type": "arrow",
+      "image": ""
+    }
+  ]
+}
