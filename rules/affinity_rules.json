@@ -1,0 +1,40 @@
+{
+  "default_values": {
+    "attack_advantage": 1.2,
+    "attack_disadvantage": 0.8,
+    "defense_advantage": 0.8,
+    "defense_disadvantage": 1.2
+  },
+  "relationships": [
+    {
+      "attacker": "ignis",
+      "defender": "terra",
+      "attack_modifier": 1.2,
+      "defense_modifier": 0.8
+    },
+    {
+      "attacker": "terra",
+      "defender": "aqua",
+      "attack_modifier": 1.2,
+      "defense_modifier": 0.8
+    },
+    {
+      "attacker": "aqua",
+      "defender": "ignis",
+      "attack_modifier": 1.2,
+      "defense_modifier": 0.8
+    },
+    {
+      "attacker": "lux",
+      "defender": "umbra",
+      "attack_modifier": 1.2,
+      "defense_modifier": 0.8
+    },
+    {
+      "attacker": "umbra",
+      "defender": "lux",
+      "attack_modifier": 1.2,
+      "defense_modifier": 0.8
+    }
+  ]
+}

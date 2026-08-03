@@ -20,6 +20,8 @@ var _command_dispatcher: CommandDispatcher
 var _projectile_registry: ProjectileDefinitionRegistry
 var _projectile_system: ProjectileSystem
 var _collision_system: CollisionSystem
+var _affinity_registry: AffinityRegistry
+var _affinity_rule_system: AffinityRuleSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
@@ -27,6 +29,8 @@ var _debug_panel: PanelContainer = null
 var _resource_panel: PanelContainer = null
 var _resource_label: Label = null
 var _card_buttons: Array[PanelContainer] = []
+var _affinity_debug_panel: PanelContainer = null
+var _affinity_debug_label: Label = null
 
 
 func _ready() -> void:
@@ -41,6 +45,8 @@ func _ready() -> void:
 	_setup_attack_system()
 	_setup_projectile_system()
 	_setup_collision_system()
+	_setup_affinity_registry()
+	_setup_affinity_rule_system()
 	_setup_economy_system()
 	_setup_command_dispatcher()
 	_setup_combat_system()
@@ -48,7 +54,9 @@ func _ready() -> void:
 	_create_card_buttons()
 	_setup_debug_panel()
 	_setup_resource_panel()
+	_setup_affinity_debug_panel()
 	EventBus.battle_started.emit()
+	EventBus.affinity_debug.connect(_on_affinity_debug)
 
 
 func _physics_process(delta: float) -> void:
@@ -161,6 +169,16 @@ func _setup_collision_system() -> void:
 	add_child(_collision_system)
 
 
+func _setup_affinity_registry() -> void:
+	_affinity_registry = AffinityRegistry.new()
+	AffinityLoader.load_affinities(_affinity_registry, "res://data/affinities.json")
+
+
+func _setup_affinity_rule_system() -> void:
+	_affinity_rule_system = AffinityRuleSystem.new()
+	_affinity_rule_system.load_rules("res://rules/affinity_rules.json")
+
+
 func _setup_economy_system() -> void:
 	_economy_system = EconomySystem.new()
 	_economy_system.initialize(_simulation_context)
@@ -174,7 +192,7 @@ func _setup_command_dispatcher() -> void:
 
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
-	_combat_system.initialize(_command_dispatcher)
+	_combat_system.initialize(_command_dispatcher, _affinity_rule_system)
 	add_child(_combat_system)
 
 
@@ -212,11 +230,32 @@ func _create_card_buttons() -> void:
 func _create_card_button(card_def: UnitDefinition) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(CARD_BUTTON_WIDTH, CARD_BUTTON_HEIGHT)
+	
+	# Apply affinity background color if available
+	if card_def.affinity_id != "" and _affinity_registry != null:
+		var affinity_def: AffinityDefinition = _affinity_registry.get_affinity(card_def.affinity_id)
+		if affinity_def != null:
+			var style := StyleBoxFlat.new()
+			style.bg_color = Color(affinity_def.primary_color, 0.3)
+			panel.add_theme_stylebox_override("panel", style)
+	
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
 	panel.add_child(vbox)
 	vbox.add_child(_create_card_image(card_def))
 	vbox.add_child(_create_label(card_def.name))
+	
+	# Add affinity display
+	if card_def.affinity_id != "" and _affinity_registry != null:
+		var affinity_def: AffinityDefinition = _affinity_registry.get_affinity(card_def.affinity_id)
+		if affinity_def != null:
+			var affinity_label := Label.new()
+			affinity_label.text = affinity_def.display_name
+			affinity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			affinity_label.add_theme_font_size_override("font_size", 9)
+			affinity_label.add_theme_color_override("font_color", affinity_def.primary_color)
+			vbox.add_child(affinity_label)
+	
 	vbox.add_child(_create_label("Cost: %d" % card_def.cost))
 	var click_button := Button.new()
 	click_button.flat = true
@@ -357,3 +396,28 @@ func _update_card_affordability() -> void:
 		var card_def: UnitDefinition = player_deck[i]
 		var can_afford: bool = _economy_system.can_afford("player", "imperium", card_def.cost)
 		button.modulate = Color(1.0, 1.0, 1.0, 1.0) if can_afford else Color(0.5, 0.5, 0.5, 0.7)
+
+
+func _setup_affinity_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_affinity_debug_panel = PanelContainer.new()
+	_affinity_debug_panel.name = "AffinityDebugPanel"
+	_affinity_debug_panel.position = Vector2(10.0, 120.0)
+	_affinity_debug_panel.custom_minimum_size = Vector2(250.0, 80.0)
+	canvas_layer.add_child(_affinity_debug_panel)
+	_affinity_debug_label = Label.new()
+	_affinity_debug_label.name = "AffinityDebugLabel"
+	_affinity_debug_label.add_theme_font_size_override("font_size", 10)
+	_affinity_debug_panel.add_child(_affinity_debug_label)
+	_affinity_debug_label.text = "Affinity Debug: Waiting..."
+
+
+func _on_affinity_debug(attacker_affinity: String, defender_affinity: String, attack_modifiers: CombatModifierCollection, final_damage: int) -> void:
+	if _affinity_debug_label == null:
+		return
+	var text: String = "Attacker: %s\nDefender: %s\n" % [attacker_affinity, defender_affinity]
+	text += "Modifiers: %d\n" % attack_modifiers.get_count()
+	if attack_modifiers.get_count() > 0:
+		text += attack_modifiers.get_description()
+	text += "Final Damage: %d" % final_damage
+	_affinity_debug_label.text = text

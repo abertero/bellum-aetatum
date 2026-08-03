@@ -22,6 +22,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  SpawnSystem | FormationSystem | SpatialQuerySystem              |
 |  TargetingSystem | CombatSystem | AttackSystem | DeckSystem      |
 |  EconomySystem | ProjectileSystem | CollisionSystem              |
+|  AffinityRegistry | AffinityRuleSystem                           |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -35,6 +36,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                        Models Layer                               |
 |  AttackModelRegistry | AttackModel | MeleeAttackModel            |
 |  RangedAttackModel | ProjectileDefinitionRegistry                |
+|  CombatModifier | CombatModifierCollection                       |
 +------------------------------------------------------------------+
          |              |
          v              v
@@ -54,7 +56,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
-|  ResourceDefinition | ProjectileDefinition                        |
+|  ResourceDefinition | ProjectileDefinition | AffinityDefinition  |
 +------------------------------------------------------------------+
          |
          v
@@ -73,7 +75,8 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                         Data Layer                                |
 |  cards.json | player_deck.json | enemy_deck.json | stage_001.json|
-|  resources.json | projectiles.json                                |
+|  resources.json | projectiles.json | affinities.json             |
+|  rules/affinity_rules.json                                       |
 +------------------------------------------------------------------+
 ```
 
@@ -92,11 +95,12 @@ Autoloaded singletons and infrastructure services available globally.
 
 Pure data containers that hold configuration parsed from JSON. No behavior, no mutable gameplay state.
 
-- **UnitDefinition**: Unit statistics (hp, attack, range, speed, cost, attack_speed, attack_model, projectile_id).
+- **UnitDefinition**: Unit statistics (hp, attack, range, speed, cost, attack_speed, attack_model, projectile_id, affinity_id).
 - **StageDefinition**: Stage configuration (battlefield_width, spawn positions, formation_spacing).
 - **DeckDefinition**: Deck card ID list.
 - **ResourceDefinition**: Resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from `data/resources/resources.json`.
 - **ProjectileDefinition**: Projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from `data/projectiles/projectiles.json`.
+- **AffinityDefinition**: Affinity properties (id, display_name, description, primary_color, icon, background). Loaded from `data/affinities.json`.
 
 ### Entities Layer
 
@@ -148,6 +152,8 @@ Attack model abstraction and registry.
 - **RangedAttackModel**: Implements ranged attack by spawning a projectile. Returns a `DamageAction` with 0 damage (actual damage applied later by CollisionSystem).
 - **AttackModelRegistry**: Registers and resolves attack models by string identifier.
 - **ProjectileDefinitionRegistry**: Registers and resolves projectile definitions by string identifier.
+- **CombatModifier**: Represents a single combat modification with id, source, priority, operation, value, description, and metadata.
+- **CombatModifierCollection**: Contains multiple CombatModifier objects and provides methods to apply them in priority order to a base value.
 
 ### Actions Layer
 
@@ -174,11 +180,13 @@ Game logic systems that orchestrate behavior.
 - **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy, projectile collisions, units along path). Read-only — never modifies state.
 - **TargetingSystem**: Assigns targets to melee and ranged units based on SpatialQuerySystem queries.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus. Handles both melee and ranged combat.
+- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus. Handles both melee and ranged combat. Requests CombatModifierCollection from AffinityRuleSystem and applies modifiers to damage.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 - **EconomySystem**: Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates.
 - **ProjectileSystem**: Manages projectile movement and lifecycle. Uses SimulationContext for time-based updates. Emits `projectile_spawned`, `projectile_moved`, `projectile_destroyed`.
 - **CollisionSystem**: Detects projectile collisions with units. Produces `DamageAction` when collision occurs. Emits `projectile_collided`. Never modifies HP directly.
+- **AffinityRegistry**: Stores and provides lookup for affinity definitions. Validates uniqueness and provides query methods.
+- **AffinityRuleSystem**: Loads affinity rules from JSON, resolves attack and defense modifiers based on attacker/defender affinity pairs, and returns CombatModifierCollection objects.
 
 ### Factories Layer
 
@@ -415,29 +423,31 @@ _physics_process(delta):
         -> SpatialQuerySystem.get_units_in_formation()
         -> SpatialQuerySystem.get_frontline()
 
-  4. CombatSystem._physics_process()
-     -> _cleanup_timers()
-     -> _cleanup_tracked_units()
-     -> _process_all_units()
-        -> _process_unit_combat() for each unit with target
-           -> For melee units:
-              -> _update_attack_timer()
-                 -> AttackCommand -> CommandDispatcher
-                    -> AttackSystem.execute()
-                       -> AttackModelRegistry.resolve()
-                       -> MeleeAttackModel.execute() -> DamageAction
-                 -> _apply_damage_action()
-                    -> target.take_damage()
-                    -> EventBus.action_performed.emit(action)
-           -> For ranged units:
-              -> _update_attack_timer()
-                 -> AttackCommand -> CommandDispatcher
-                    -> AttackSystem.execute()
-                       -> AttackModelRegistry.resolve()
-                       -> RangedAttackModel.execute() -> DamageAction(0)
-                          -> ProjectileFactory.create_projectile()
-                 -> _apply_damage_action()
-                    -> action.damage is 0, no immediate damage
+   4. CombatSystem._physics_process()
+      -> _cleanup_timers()
+      -> _cleanup_tracked_units()
+      -> _process_all_units()
+         -> _process_unit_combat() for each unit with target
+            -> For melee units:
+               -> _update_attack_timer()
+                  -> AttackCommand -> CommandDispatcher
+                     -> AttackSystem.execute()
+                        -> AttackModelRegistry.resolve()
+                        -> MeleeAttackModel.execute() -> DamageAction
+                  -> _apply_damage_action()
+                     -> AffinityRuleSystem.get_attack_modifiers() -> CombatModifierCollection
+                     -> Apply modifiers to base damage
+                     -> target.take_damage(final_damage)
+                     -> EventBus.action_performed.emit(action)
+            -> For ranged units:
+               -> _update_attack_timer()
+                  -> AttackCommand -> CommandDispatcher
+                     -> AttackSystem.execute()
+                        -> AttackModelRegistry.resolve()
+                        -> RangedAttackModel.execute() -> DamageAction(0)
+                           -> ProjectileFactory.create_projectile()
+                  -> _apply_damage_action()
+                     -> action.damage is 0, no immediate damage
 
   5. ProjectileSystem._physics_process()
      -> _update_all_projectiles()

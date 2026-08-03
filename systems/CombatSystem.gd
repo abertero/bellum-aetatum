@@ -2,12 +2,14 @@ class_name CombatSystem
 extends Node
 
 var _command_dispatcher: CommandDispatcher
+var _affinity_rule_system: AffinityRuleSystem
 var _attack_timers: Dictionary
 var _tracked_units: Array[UnitInstance] = []
 
 
-func initialize(command_dispatcher: CommandDispatcher) -> void:
+func initialize(command_dispatcher: CommandDispatcher, affinity_rule_system: AffinityRuleSystem) -> void:
 	_command_dispatcher = command_dispatcher
+	_affinity_rule_system = affinity_rule_system
 	_attack_timers = {}
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
@@ -92,8 +94,32 @@ func _apply_damage_action(action: DamageAction) -> void:
 		return
 	if action.damage <= 0:
 		return
-	action.target.take_damage(action.damage)
+	
+	var final_damage: int = _calculate_final_damage(action)
+	action.target.take_damage(final_damage)
 	EventBus.action_performed.emit(action)
+
+
+func _calculate_final_damage(action: DamageAction) -> int:
+	var base_damage: float = float(action.damage)
+	
+	if action.source == null or not is_instance_valid(action.source):
+		return int(base_damage)
+	if action.target == null or not is_instance_valid(action.target):
+		return int(base_damage)
+	
+	var attacker_affinity: String = action.source.definition.affinity_id
+	var defender_affinity: String = action.target.definition.affinity_id
+	
+	if attacker_affinity == "" or defender_affinity == "":
+		return int(base_damage)
+	
+	var attack_modifiers: CombatModifierCollection = _affinity_rule_system.get_attack_modifiers(attacker_affinity, defender_affinity)
+	var final_damage: float = attack_modifiers.apply_to(base_damage)
+	
+	EventBus.affinity_debug.emit(attacker_affinity, defender_affinity, attack_modifiers, int(final_damage))
+	
+	return int(final_damage)
 
 
 func _on_unit_spawned(unit: UnitInstance) -> void:

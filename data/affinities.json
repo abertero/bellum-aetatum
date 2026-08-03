@@ -1,0 +1,44 @@
+{
+  "affinities": [
+    {
+      "id": "ignis",
+      "display_name": "Ignis",
+      "description": "Fire affinity - strong against Terra, weak against Aqua",
+      "primary_color": "#FF4500",
+      "icon": "res://assets/icons/ignis.png",
+      "background": "res://assets/backgrounds/ignis_bg.png"
+    },
+    {
+      "id": "aqua",
+      "display_name": "Aqua",
+      "description": "Water affinity - strong against Ignis, weak against Terra",
+      "primary_color": "#1E90FF",
+      "icon": "res://assets/icons/aqua.png",
+      "background": "res://assets/backgrounds/aqua_bg.png"
+    },
+    {
+      "id": "terra",
+      "display_name": "Terra",
+      "description": "Earth affinity - strong against Aqua, weak against Ignis",
+      "primary_color": "#8B4513",
+      "icon": "res://assets/icons/terra.png",
+      "background": "res://assets/backgrounds/terra_bg.png"
+    },
+    {
+      "id": "lux",
+      "display_name": "Lux",
+      "description": "Light affinity - strong against Umbra, weak against Umbra",
+      "primary_color": "#FFD700",
+      "icon": "res://assets/icons/lux.png",
+      "background": "res://assets/backgrounds/lux_bg.png"
+    },
+    {
+      "id": "umbra",
+      "display_name": "Umbra",
+      "description": "Dark affinity - strong against Lux, weak against Lux",
+      "primary_color": "#4B0082",
+      "icon": "res://assets/icons/umbra.png",
+      "background": "res://assets/backgrounds/umbra_bg.png"
+    }
+  ]
+}

@@ -22,11 +22,11 @@ res://
     core/                # Autoload singletons and core utilities (EventBus, JsonLoader, UnitState, SimulationContext)
     entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent, ProjectileInstance)
     commands/            # Command framework (GameCommand, PlayCardCommand, AttackCommand, CommandDispatcher)
-    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem, ProjectileSystem, CollisionSystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem, ProjectileSystem, CollisionSystem, AffinityRegistry, AffinityRuleSystem)
     actions/             # Action framework (GameAction, DamageAction)
     resources/           # Resource runtime state (ResourceInstance)
-    models/              # Attack models and registry (AttackModel, MeleeAttackModel, RangedAttackModel, AttackModelRegistry, ProjectileDefinitionRegistry)
-    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition)
+    models/              # Attack models and registry (AttackModel, MeleeAttackModel, RangedAttackModel, AttackModelRegistry, ProjectileDefinitionRegistry, CombatModifier, CombatModifierCollection)
+    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition, AffinityDefinition)
     factories/           # Object factories (UnitFactory, ProjectileFactory)
     data/
         cards/           # Card database (cards.json)
@@ -34,6 +34,9 @@ res://
         stages/          # Stage configurations (stage_001.json)
         resources/       # Resource definitions (resources.json)
         projectiles/     # Projectile definitions (projectiles.json)
+        affinities.json  # Affinity definitions
+    rules/
+        affinity_rules.json  # Affinity relationship rules
     assets/
         cards/           # Card artwork (future)
     docs/
@@ -86,11 +89,13 @@ Game logic systems that orchestrate behavior.
 | `SpatialQuerySystem` | RefCounted | Provides battlefield queries (frontline, units by owner/state, closest enemy, projectile collisions, units along path). Read-only. |
 | `TargetingSystem` | Node | Assigns targets to melee and ranged units via SpatialQuerySystem. |
 | `AttackSystem` | RefCounted | Executes attacks via AttackModelRegistry. Produces DamageAction. Emits attack events. |
-| `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. Handles both melee and ranged combat. |
+| `CombatSystem` | Node | Orchestrates combat timing, dispatches AttackCommand, consumes DamageAction, applies HP. Tracks units via EventBus. Handles both melee and ranged combat. Requests CombatModifierCollection from AffinityRuleSystem and applies modifiers to damage. |
 | `DeckSystem` | Node (autoload) | Loads card database and resolves deck lists. |
 | `EconomySystem` | Node | Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates. |
 | `ProjectileSystem` | Node | Manages projectile movement and lifecycle. Uses SimulationContext for time-based updates. Emits projectile events. |
 | `CollisionSystem` | Node | Detects projectile collisions with units. Produces DamageAction when collision occurs. Never modifies HP directly. |
+| `AffinityRegistry` | RefCounted | Stores and provides lookup for affinity definitions. Validates uniqueness and provides query methods. |
+| `AffinityRuleSystem` | RefCounted | Loads affinity rules from JSON, resolves attack and defense modifiers based on attacker/defender affinity pairs, and returns CombatModifierCollection objects. |
 
 ### Models
 
@@ -103,6 +108,8 @@ Attack model abstraction and registry.
 | `RangedAttackModel` | RefCounted | Spawns projectile for ranged attacks. Returns `DamageAction` with 0 damage (actual damage applied later by CollisionSystem). |
 | `AttackModelRegistry` | RefCounted | Registers and resolves attack models by identifier. |
 | `ProjectileDefinitionRegistry` | RefCounted | Registers and resolves projectile definitions by identifier. |
+| `CombatModifier` | RefCounted | Represents a single combat modification with id, source, priority, operation, value, description, and metadata. |
+| `CombatModifierCollection` | RefCounted | Contains multiple CombatModifier objects and provides methods to apply them in priority order to a base value. |
 
 ### Actions
 
@@ -145,6 +152,7 @@ Pure data containers parsed from JSON.
 | `DeckDefinition` | RefCounted | Stores deck card IDs. |
 | `ResourceDefinition` | RefCounted | Stores resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from resources.json. |
 | `ProjectileDefinition` | RefCounted | Stores projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from projectiles.json. |
+| `AffinityDefinition` | RefCounted | Stores affinity properties (id, display_name, description, primary_color, icon, background). Loaded from affinities.json. |
 
 ### Factories
 
@@ -278,15 +286,16 @@ Unit dies
 - [x] **Milestone 8** - Command Framework: GameCommand base class, PlayCardCommand, AttackCommand, CommandDispatcher
 - [x] **Milestone 9** - Economy Layer: EconomySystem, ResourceDefinition, ResourceInstance, SimulationContext, command validation, resource regeneration
 - [x] **Milestone 10** - Projectile Layer: ProjectileDefinition, ProjectileInstance, ProjectileFactory, ProjectileSystem, CollisionSystem, RangedAttackModel, projectile collision detection
+- [x] **Milestone 11** - Affinity Rule Engine: AffinityDefinition, AffinityRegistry, AffinityRuleSystem, CombatModifier, CombatModifierCollection, affinity-based damage modifiers, UI affinity display
 
 ### Planned
 
-- [ ] **Milestone 11** - Abilities and passives: ability system, trigger conditions
-- [ ] **Milestone 12** - Status effects: buffs, debuffs, duration, stacking
-- [ ] **Milestone 13** - Victory conditions: base destruction, win/lose detection
-- [ ] **Milestone 14** - Animations and visual effects
-- [ ] **Milestone 15** - Audio: sound effects, music
-- [ ] **Milestone 16** - Menus, settings, save system
+- [ ] **Milestone 12** - Abilities and passives: ability system, trigger conditions
+- [ ] **Milestone 13** - Status effects: buffs, debuffs, duration, stacking
+- [ ] **Milestone 14** - Victory conditions: base destruction, win/lose detection
+- [ ] **Milestone 15** - Animations and visual effects
+- [ ] **Milestone 16** - Audio: sound effects, music
+- [ ] **Milestone 17** - Menus, settings, save system
 
 ## Architecture Rules
 
