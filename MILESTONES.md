@@ -1919,4 +1919,234 @@ Introduce a Projectile Layer that enables ranged combat. Projectiles become firs
 - Debug rendering can be extended with more information.
 - Projectile physics can be added (gravity, wind, etc.).
 
+---
+
+## Milestone 11 — Affinity Rule Engine
+
+### Objective
+
+Introduce a fully data-driven Affinity Rule Engine that enables affinity-based combat modifiers. CombatSystem must remain completely generic and never know about specific affinity types. All affinity information must be loaded from JSON. The implementation must be generic enough to support future combat modifiers (terrain, weather, abilities, equipment, status effects).
+
+### What Was Implemented
+
+#### 1. AffinityDefinition
+
+- New `AffinityDefinition` class (`definitions/AffinityDefinition.gd`), extends `RefCounted`.
+- Pure data container for affinity properties.
+- Fields: `id`, `display_name`, `description`, `primary_color`, `icon`, `background`.
+- Loaded from `data/affinities.json`.
+- Immutable after creation.
+
+#### 2. AffinityRegistry
+
+- New `AffinityRegistry` class (`systems/AffinityRegistry.gd`), extends `RefCounted`.
+- Stores and provides lookup for affinity definitions.
+- Validates uniqueness (no duplicate IDs).
+- Provides API: `register()`, `get_affinity()`, `has_affinity()`, `get_all_affinities()`, `get_count()`.
+
+#### 3. AffinityLoader
+
+- New `AffinityLoader` class (`systems/AffinityLoader.gd`), extends `RefCounted`.
+- Static loader that reads affinity definitions from JSON and populates the registry.
+- Provides API: `load_affinities(registry, file_path)`.
+
+#### 4. CombatModifier
+
+- New `CombatModifier` class (`models/CombatModifier.gd`), extends `RefCounted`.
+- Represents a single combat modification.
+- Fields: `id`, `source`, `priority`, `operation`, `value`, `description`, `metadata`.
+- Supported operations: `MULTIPLY`, `ADD`, `OVERRIDE`, `MIN`, `MAX`.
+- Provides static factory methods: `create_multiply()`, `create_add()`, `create_override()`, `create_min()`, `create_max()`.
+
+#### 5. CombatModifierCollection
+
+- New `CombatModifierCollection` class (`models/CombatModifierCollection.gd`), extends `RefCounted`.
+- Contains multiple CombatModifier objects.
+- Provides methods to apply modifiers in priority order to a base value.
+- Provides API: `add_modifier()`, `add_modifiers()`, `get_modifiers()`, `get_count()`, `is_empty()`, `apply_to(base_value)`, `get_description()`.
+
+#### 6. AffinityRuleSystem
+
+- New `AffinityRuleSystem` class (`systems/AffinityRuleSystem.gd`), extends `RefCounted`.
+- Loads affinity rules from JSON.
+- Resolves attack and defense modifiers based on attacker/defender affinity pairs.
+- Returns CombatModifierCollection objects.
+- Provides API: `load_rules(file_path)`, `get_attack_modifiers(attacker_affinity, defender_affinity)`, `get_defense_modifiers(attacker_affinity, defender_affinity)`, `get_default_attack_advantage()`, `get_default_attack_disadvantage()`, `get_default_defense_advantage()`, `get_default_defense_disadvantage()`.
+
+#### 7. UnitDefinition Update
+
+- Added `affinity_id: String` field to UnitDefinition.
+- Parsed from `stats.affinity_id` in card JSON.
+
+#### 8. CombatSystem Update
+
+- Updated to accept AffinityRuleSystem in `initialize()`.
+- Added `_calculate_final_damage()` method that requests CombatModifierCollection from AffinityRuleSystem and applies modifiers to base damage.
+- Updated `_apply_damage_action()` to use calculated final damage.
+
+#### 9. BattleScene Update
+
+- Added AffinityRegistry and AffinityRuleSystem variables.
+- Added `_setup_affinity_registry()` method.
+- Added `_setup_affinity_rule_system()` method.
+- Updated `_ready()` to call new setup methods.
+- Updated `_setup_combat_system()` to pass AffinityRuleSystem.
+- Updated `_create_card_button()` to display affinity information (background color, affinity name with primary color).
+- Added `_setup_affinity_debug_panel()` method.
+- Added `_on_affinity_debug()` signal handler.
+- Connected to `EventBus.affinity_debug` signal.
+
+#### 10. EventBus Update
+
+- Added `affinity_debug(attacker_affinity, defender_affinity, attack_modifiers, final_damage)` signal.
+
+#### 11. Data Configuration
+
+- Created `data/affinities.json` with 5 affinity definitions:
+  - ignis (Fire) - #FF4500
+  - aqua (Water) - #1E90FF
+  - terra (Earth) - #8B4513
+  - lux (Light) - #FFD700
+  - umbra (Dark) - #4B0082
+
+- Created `rules/affinity_rules.json` with:
+  - Default values: attack_advantage=1.2, attack_disadvantage=0.8, defense_advantage=0.8, defense_disadvantage=1.2
+  - Relationships:
+    - ignis > terra (1.2 attack, 0.8 defense)
+    - terra > aqua (1.2 attack, 0.8 defense)
+    - aqua > ignis (1.2 attack, 0.8 defense)
+    - lux ↔ umbra (1.2 attack, 0.8 defense both ways)
+
+- Updated `data/cards/cards.json` with affinity_id for all 33 cards.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `definitions/AffinityDefinition.gd` | 23 | Pure data container for affinity properties |
+| `systems/AffinityRegistry.gd` | 35 | Stores and provides lookup for affinity definitions |
+| `systems/AffinityLoader.gd` | 28 | Static loader for affinity definitions from JSON |
+| `models/CombatModifier.gd` | 68 | Represents a single combat modification |
+| `models/CombatModifierCollection.gd` | 52 | Contains and applies multiple combat modifiers |
+| `systems/AffinityRuleSystem.gd` | 75 | Loads affinity rules and resolves modifiers |
+| `data/affinities.json` | 38 | Affinity definitions |
+| `rules/affinity_rules.json` | 33 | Affinity relationship rules |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +1 signal | Added affinity_debug signal |
+| `definitions/UnitDefinition.gd` | +2 lines | Added affinity_id field |
+| `systems/CombatSystem.gd` | +20 lines | Added modifier calculation and application |
+| `scenes/battle_scene.gd` | +50 lines | Setup affinity systems, UI display, debug panel |
+| `data/cards/cards.json` | +33 lines | Added affinity_id to all cards |
+
+### Affinity Combat Flow
+
+```
+1. CombatSystem detects attack
+2. CombatSystem creates DamageAction
+3. CombatSystem._apply_damage_action()
+4. CombatSystem._calculate_final_damage()
+   a. Get attacker and defender affinities
+   b. Request CombatModifierCollection from AffinityRuleSystem
+   c. AffinityRuleSystem.get_attack_modifiers(attacker_affinity, defender_affinity)
+   d. AffinityRuleSystem looks up relationship in rules
+   e. AffinityRuleSystem creates CombatModifier objects
+   f. AffinityRuleSystem returns CombatModifierCollection
+   g. Apply modifiers to base damage using apply_to()
+   h. EventBus.affinity_debug emitted (for debug display)
+5. CombatSystem applies final damage to target
+6. EventBus.action_performed emitted
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **AffinityDefinition**: Only stores affinity properties. No behavior.
+- **AffinityRegistry**: Only stores and provides lookup. No rule resolution.
+- **AffinityLoader**: Only loads definitions from JSON. No validation logic.
+- **CombatModifier**: Only represents a single modification. No collection logic.
+- **CombatModifierCollection**: Only applies modifiers. No affinity knowledge.
+- **AffinityRuleSystem**: Only resolves affinity rules. No damage calculation.
+- **CombatSystem**: Remains the only system that modifies HP.
+
+#### Open/Closed Principle
+
+- New affinity types can be added via JSON without modifying code.
+- New affinity relationships can be added via JSON without modifying code.
+- New modifier operations can be added to CombatModifier.
+- Future modifier systems (terrain, weather, abilities) can append to CombatModifierCollection without modifying CombatSystem.
+
+#### Dependency Inversion
+
+- CombatSystem depends on CombatModifierCollection abstraction, not specific affinity types.
+- AffinityRuleSystem depends on CombatModifier abstraction, not specific implementations.
+- UI depends on AffinityDefinition abstraction, not specific affinity types.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each class has one responsibility (definition, registry, loader, modifier, collection, rule system) |
+| Open/Closed | New affinities and relationships added via JSON, new operations via extension |
+| Liskov Substitution | Any CombatModifier can be used interchangeably |
+| Interface Segregation | Systems depend only on methods they use |
+| Dependency Inversion | Systems depend on abstractions (CombatModifierCollection, AffinityDefinition) |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All new classes are under 80 lines |
+| Functions under 30 lines | All functions are 1-15 lines |
+| Composition over inheritance | CombatModifierCollection composed with CombatModifier, systems composed with registries |
+| No duplicated logic | Affinity rules centralized in AffinityRuleSystem, modifier application in CombatModifierCollection |
+| Dependencies point inward | Systems → AffinityRuleSystem → CombatModifierCollection → CombatModifier → AffinityDefinition |
+
+### Behavior Changes
+
+- Units now deal modified damage based on affinity relationships
+- Affinity advantages provide 20% bonus damage (1.2x multiplier)
+- Affinity disadvantages provide 20% penalty damage (0.8x multiplier)
+- Cards display affinity information in UI (background color, affinity name with primary color)
+- Debug panel shows affinity modifier calculations
+
+### Existing Gameplay Preserved
+
+- CombatSystem remains the only system that modifies HP
+- Unit spawning unchanged
+- Formation unchanged
+- Targeting unchanged
+- Death unchanged
+- Movement unchanged
+- Economy unchanged
+- Projectile system unchanged
+
+### What Was NOT Implemented (Intentionally)
+
+- Terrain modifiers
+- Weather modifiers
+- Ability modifiers
+- Equipment modifiers
+- Status effect modifiers
+- Legendary modifiers
+- Modifier stacking rules (diminishing returns, caps)
+- Modifier visualization (show all active modifiers in UI)
+- Modifier history tracking
+- Additional affinity types (only 5 implemented)
+- Additional affinity relationships (only basic rock-paper-scissors implemented)
+
+### Extension Points for Future Milestones
+
+- `AffinityDefinition` can be extended with new affinity types via JSON.
+- `AffinityRuleSystem` can support complex affinity relationships (multi-affinity, conditional).
+- `CombatModifier` can support additional operations (DIVIDE, MODULO).
+- `CombatModifierCollection` can support modifier stacking rules.
+- Future modifier systems (TerrainSystem, WeatherSystem, AbilitySystem, EquipmentSystem, StatusEffectSystem) can append to CombatModifierCollection without modifying CombatSystem.
+- Affinity events can be consumed by UI, analytics, achievements.
+- Debug display can be extended with more information.
+
 
