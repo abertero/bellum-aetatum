@@ -80,3 +80,5 @@ mono_crash.*.json
 *.tmp
 *.temp
 uid://
+
+*.jpg
