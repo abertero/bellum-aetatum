@@ -22,6 +22,8 @@ var _projectile_system: ProjectileSystem
 var _collision_system: CollisionSystem
 var _affinity_registry: AffinityRegistry
 var _affinity_rule_system: AffinityRuleSystem
+var _effect_registry: EffectRegistry
+var _effect_system: EffectSystem
 var _unit_container: Node2D
 var _enemy_spawn_timer: float = 0.0
 var _enemy_deck_index: int = 0
@@ -31,6 +33,8 @@ var _resource_label: Label = null
 var _card_buttons: Array[PanelContainer] = []
 var _affinity_debug_panel: PanelContainer = null
 var _affinity_debug_label: Label = null
+var _effect_debug_panel: PanelContainer = null
+var _effect_debug_label: Label = null
 
 
 func _ready() -> void:
@@ -47,6 +51,8 @@ func _ready() -> void:
 	_setup_collision_system()
 	_setup_affinity_registry()
 	_setup_affinity_rule_system()
+	_setup_effect_registry()
+	_setup_effect_system()
 	_setup_economy_system()
 	_setup_command_dispatcher()
 	_setup_combat_system()
@@ -55,8 +61,14 @@ func _ready() -> void:
 	_setup_debug_panel()
 	_setup_resource_panel()
 	_setup_affinity_debug_panel()
+	_setup_effect_debug_panel()
 	EventBus.battle_started.emit()
 	EventBus.affinity_debug.connect(_on_affinity_debug)
+	EventBus.effect_applied.connect(_on_effect_changed)
+	EventBus.effect_removed.connect(_on_effect_changed)
+	EventBus.effect_expired.connect(_on_effect_changed)
+	EventBus.effect_stack_changed.connect(_on_effect_changed)
+	EventBus.unit_spawned.connect(_on_unit_spawned_for_effects)
 
 
 func _physics_process(delta: float) -> void:
@@ -65,6 +77,7 @@ func _physics_process(delta: float) -> void:
 	_update_debug_panel()
 	_update_resource_panel()
 	_update_card_affordability()
+	_update_effect_debug_panel()
 
 
 func _update_enemy_spawn_timer(delta: float) -> void:
@@ -192,7 +205,7 @@ func _setup_command_dispatcher() -> void:
 
 func _setup_combat_system() -> void:
 	_combat_system = CombatSystem.new()
-	_combat_system.initialize(_command_dispatcher, _affinity_rule_system)
+	_combat_system.initialize(_command_dispatcher, _affinity_rule_system, _effect_system)
 	add_child(_combat_system)
 
 
@@ -421,3 +434,84 @@ func _on_affinity_debug(attacker_affinity: String, defender_affinity: String, at
 		text += attack_modifiers.get_description()
 	text += "Final Damage: %d" % final_damage
 	_affinity_debug_label.text = text
+
+
+func _setup_effect_registry() -> void:
+	_effect_registry = EffectRegistry.new()
+	EffectLoader.load_effects(_effect_registry, "res://data/effects.json")
+
+
+func _setup_effect_system() -> void:
+	_effect_system = EffectSystem.new()
+	_effect_system.initialize(_effect_registry)
+	add_child(_effect_system)
+
+
+func _setup_effect_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_effect_debug_panel = PanelContainer.new()
+	_effect_debug_panel.name = "EffectDebugPanel"
+	_effect_debug_panel.position = Vector2(10.0, 210.0)
+	_effect_debug_panel.custom_minimum_size = Vector2(280.0, 120.0)
+	canvas_layer.add_child(_effect_debug_panel)
+	_effect_debug_label = Label.new()
+	_effect_debug_label.name = "EffectDebugLabel"
+	_effect_debug_label.add_theme_font_size_override("font_size", 10)
+	_effect_debug_panel.add_child(_effect_debug_label)
+	_effect_debug_label.text = "Effects: Waiting..."
+
+
+func _on_unit_spawned_for_effects(unit: UnitInstance) -> void:
+	if _effect_system == null:
+		return
+	if unit.unit_owner == "player":
+		_effect_system.apply_effect("strength", unit, null)
+	elif unit.unit_owner == "enemy":
+		_effect_system.apply_effect("shield", unit, null)
+
+
+func _on_effect_changed(_effect: EffectInstance) -> void:
+	pass
+
+
+func _update_effect_debug_panel() -> void:
+	if _effect_debug_label == null or _effect_system == null:
+		return
+	var count: int = _effect_system.get_active_effect_count()
+	var text: String = "Active Effects: %d\n" % count
+	text += "---\n"
+	if count == 0:
+		text += "No active effects"
+	else:
+		text += _build_effect_debug_text()
+	_effect_debug_label.text = text
+
+
+func _build_effect_debug_text() -> String:
+	var text: String = ""
+	var units: Array[UnitInstance] = _get_all_tracked_units()
+	for unit in units:
+		if not is_instance_valid(unit) or not unit.is_alive():
+			continue
+		var effects: Array[EffectInstance] = _effect_system.get_effects_for_unit(unit)
+		for effect in effects:
+			var mods: Array[CombatModifier] = effect.get_attack_modifiers()
+			mods.append_array(effect.get_defense_modifiers())
+			text += "%s on %s | %.1fs | x%d | Mods: %d\n" % [
+				effect.definition.display_name,
+				unit.definition.name,
+				effect.remaining_duration,
+				effect.stack_count,
+				mods.size()
+			]
+	return text
+
+
+func _get_all_tracked_units() -> Array[UnitInstance]:
+	var result: Array[UnitInstance] = []
+	if _unit_container == null:
+		return result
+	for child in _unit_container.get_children():
+		if child is UnitInstance:
+			result.append(child)
+	return result

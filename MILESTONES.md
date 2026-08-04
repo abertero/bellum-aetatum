@@ -2149,4 +2149,267 @@ Introduce a fully data-driven Affinity Rule Engine that enables affinity-based c
 - Affinity events can be consumed by UI, analytics, achievements.
 - Debug display can be extended with more information.
 
+---
+
+## Milestone 12 — Effect Engine
+
+### Objective
+
+Introduce a generic Effect Engine that enables reusable, data-driven gameplay effects. Effects become first-class runtime objects with lifecycle management, stacking policies, duration tracking, trigger infrastructure, and CombatModifier generation. CombatSystem remains generic and never hardcodes specific effect types.
+
+### What Was Implemented
+
+#### 1. EffectDefinition
+
+- New `EffectDefinition` class (`definitions/EffectDefinition.gd`), extends `RefCounted`.
+- Pure data container for effect properties.
+- Fields: `id`, `display_name`, `description`, `icon`, `duration`, `stacking_policy`, `refresh_policy`, `visual_hint`, `triggers`, `modifiers`, `metadata`.
+- Loaded from `data/effects.json`.
+- Immutable after creation.
+- Future fields can be added without code changes.
+
+#### 2. EffectRegistry
+
+- New `EffectRegistry` class (`systems/EffectRegistry.gd`), extends `RefCounted`.
+- Stores and provides lookup for effect definitions.
+- Validates uniqueness (no duplicate IDs).
+- Provides API: `register()`, `get_effect()`, `has_effect()`, `get_all_effects()`, `get_count()`.
+
+#### 3. EffectLoader
+
+- New `EffectLoader` class (`systems/EffectLoader.gd`), extends `RefCounted`.
+- Static loader that reads effect definitions from JSON and populates the registry.
+- Provides API: `load_effects(registry, file_path)`.
+
+#### 4. EffectInstance
+
+- New `EffectInstance` class (`effects/EffectInstance.gd`), extends `RefCounted`.
+- Runtime effect state object.
+- Fields: `instance_id`, `definition`, `source`, `owner`, `remaining_duration`, `stack_count`, `state`, `metadata`.
+- State enum: `ACTIVE`, `EXPIRED`, `REMOVED`.
+- Generates `CombatModifier` objects from definition's modifier data, scaled by stack_count.
+- Provides API: `update()`, `is_expired()`, `is_active()`, `refresh_duration()`, `add_stack()`, `remove()`, `has_trigger()`, `get_attack_modifiers()`, `get_defense_modifiers()`.
+
+#### 5. EffectSystem
+
+- New `EffectSystem` class (`systems/EffectSystem.gd`), extends `Node`.
+- Manages effect lifecycle.
+- Responsibilities: create effects, destroy expired effects, update durations, handle stacking, refresh durations, emit events, dispatch triggers.
+- Never modifies HP directly. Never updates UI.
+- Subscribes to EventBus signals for trigger dispatch.
+- Provides API: `apply_effect()`, `remove_effect()`, `remove_all_effects_from()`, `get_effects_for_unit()`, `get_attack_modifiers()`, `get_defense_modifiers()`, `get_active_effect_count()`.
+
+#### 6. Stacking Policies
+
+- **NO_STACK**: Reject duplicate application.
+- **STACK**: Increment stack_count, each stack adds full modifier value.
+- **REFRESH_DURATION**: Reset duration to full, don't stack.
+- **REPLACE**: Remove old effect, apply new one.
+
+#### 7. Trigger Infrastructure
+
+- Effects declare triggers in definition: `OnApply`, `OnRemove`, `OnTurn`, `OnAttack`, `OnReceiveDamage`, `OnDeath`.
+- EffectSystem subscribes to EventBus signals and dispatches to affected effects.
+- Only infrastructure is implemented; no complex behaviors.
+
+#### 8. CombatModifier Integration
+
+- EffectSystem provides `get_attack_modifiers(unit)` and `get_defense_modifiers(unit)`.
+- CombatSystem queries EffectSystem and appends effect modifiers to the same CombatModifierCollection used by AffinityRuleSystem.
+- CombatSystem's core logic (timers, commands, HP modification) remains unchanged.
+
+#### 9. EventBus Updates
+
+- Added `effect_applied(effect: EffectInstance)` signal.
+- Added `effect_removed(effect: EffectInstance)` signal.
+- Added `effect_expired(effect: EffectInstance)` signal.
+- Added `effect_refreshed(effect: EffectInstance)` signal.
+- Added `effect_stack_changed(effect: EffectInstance)` signal.
+
+#### 10. UI Integration
+
+- UnitVisualComponent displays effect icons above units.
+- Icons are colored rectangles (green for buff, red for debuff, gray for unknown).
+- Tooltip shows effect display_name, description, and stack_count.
+- Icons update automatically when effects change via EventBus signals.
+
+#### 11. Debug Panel
+
+- Effect debug panel shows active effect count, effect name, owner unit, remaining duration, stack count, and modifier count.
+- Updates every frame.
+
+#### 12. Initial Effects
+
+- **Strength**: +10% attack (MULTIPLY 1.1 on attack, STACK policy, 10s duration).
+- **Shield**: -10% incoming damage (MULTIPLY 0.9 on defense, STACK policy, 10s duration).
+- Player units receive Strength on spawn. Enemy units receive Shield on spawn.
+
+#### 13. Data Configuration
+
+- Created `data/effects.json` with Strength and Shield definitions.
+- All values loaded from JSON. No hardcoded effect data.
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `definitions/EffectDefinition.gd` | 42 | Pure data container for effect properties |
+| `systems/EffectRegistry.gd` | 35 | Stores and provides lookup for effect definitions |
+| `systems/EffectLoader.gd` | 31 | Static loader for effect definitions from JSON |
+| `effects/EffectInstance.gd` | 107 | Runtime effect state and modifier generation |
+| `systems/EffectSystem.gd` | 210 | Effect lifecycle management |
+| `data/effects.json` | 44 | Effect definitions (Strength, Shield) |
+| `docs/adr/ADR-013-Effect-Engine.md` | 147 | Architecture Decision Record |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +5 signals | Added effect events |
+| `systems/CombatSystem.gd` | +14 lines | Added EffectSystem integration for modifier collection |
+| `entities/UnitVisualComponent.gd` | +86 lines | Added effect icon display with tooltips |
+| `scenes/battle_scene.gd` | +94 lines | Setup EffectSystem, effect debug panel, demo effect application |
+
+### Effect Lifecycle Flow
+
+```
+1. BattleScene._setup_effect_registry()
+   -> EffectLoader.load_effects() from data/effects.json
+   -> EffectRegistry populated with definitions
+
+2. BattleScene._setup_effect_system()
+   -> EffectSystem.initialize(registry)
+   -> EffectSystem connects to EventBus signals
+
+3. Unit spawned
+   -> EventBus.unit_spawned emitted
+   -> BattleScene._on_unit_spawned_for_effects()
+   -> EffectSystem.apply_effect("strength"/"shield", unit)
+   -> EffectSystem creates EffectInstance
+   -> EffectSystem tracks instance
+   -> EventBus.effect_applied emitted
+   -> UnitVisualComponent._on_effect_applied()
+   -> Effect icons updated
+
+4. Combat occurs
+   -> CombatSystem._calculate_final_damage()
+   -> AffinityRuleSystem.get_attack_modifiers() -> CombatModifierCollection
+   -> EffectSystem.get_attack_modifiers(attacker) -> Array[CombatModifier]
+   -> EffectSystem.get_defense_modifiers(defender) -> Array[CombatModifier]
+   -> All modifiers merged into single collection
+   -> Collection.apply_to(base_damage) -> final_damage
+   -> target.take_damage(final_damage)
+
+5. Effect duration expires
+   -> EffectSystem._physics_process(delta)
+   -> EffectInstance.update(delta) -> remaining_duration decreases
+   -> EffectInstance state -> EXPIRED
+   -> EffectSystem._cleanup_expired_effects()
+   -> EventBus.effect_expired emitted
+   -> UnitVisualComponent._on_effect_expired()
+   -> Effect icons updated
+
+6. Unit dies
+   -> EventBus.unit_died emitted
+   -> EffectSystem._on_unit_died()
+   -> EffectSystem.remove_all_effects_from(unit)
+   -> EventBus.effect_removed emitted for each effect
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **EffectDefinition**: Only stores effect properties. No behavior.
+- **EffectRegistry**: Only stores and provides lookup. No lifecycle management.
+- **EffectLoader**: Only loads definitions from JSON. No validation logic.
+- **EffectInstance**: Only manages runtime state and modifier generation. No lifecycle management.
+- **EffectSystem**: Only manages effect lifecycle. No HP modification, no UI updates.
+- **CombatSystem**: Consumes CombatModifierCollection. Doesn't know about specific effects.
+
+#### Open/Closed Principle
+
+- New effects can be added via JSON without modifying code.
+- New stacking policies can be added to EffectSystem.
+- New trigger types can be added to EffectSystem.
+- CombatSystem doesn't need changes for new effect types.
+
+#### Dependency Inversion
+
+- CombatSystem depends on CombatModifierCollection abstraction, not specific effect types.
+- EffectSystem depends on EffectDefinition abstraction, not specific implementations.
+- UI depends on EffectDefinition for display data, not hardcoded values.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each class has one responsibility (definition, registry, loader, instance, system) |
+| Open/Closed | New effects added via JSON, new behaviors via extension |
+| Liskov Substitution | Any EffectInstance can be used interchangeably |
+| Interface Segregation | Systems depend only on methods they use |
+| Dependency Inversion | Systems depend on abstractions (CombatModifierCollection, EffectDefinition) |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All new classes are under 210 lines |
+| Functions under 30 lines | All functions are 1-15 lines |
+| Composition over inheritance | EffectSystem composed with EffectRegistry, EffectInstance composed with EffectDefinition |
+| No duplicated logic | Effect lifecycle centralized in EffectSystem, modifier generation in EffectInstance |
+| Dependencies point inward | Systems -> EffectSystem -> EffectInstance -> EffectDefinition |
+
+### Behavior Changes
+
+- Player units spawn with Strength effect (+10% attack)
+- Enemy units spawn with Shield effect (-10% incoming damage)
+- Effects display as colored icons above units
+- Effect tooltips show name, description, and stack count
+- Debug panel shows active effects with durations and modifiers
+- Effects expire after 10 seconds
+- Effects can stack (same effect applied multiple times increases stack count)
+- Combat damage is modified by active effects
+
+### Existing Gameplay Preserved
+
+- CombatSystem remains the only system that modifies HP
+- Core combat flow unchanged (timers, commands, attack models)
+- Affinity system unchanged
+- Unit spawning unchanged
+- Formation unchanged
+- Targeting unchanged
+- Death unchanged
+- Movement unchanged
+- Economy unchanged
+- Projectile system unchanged
+
+### What Was NOT Implemented (Intentionally)
+
+- Poison, Burn, Freeze, Stun, Bleeding, Regeneration, Silence, Fear effects
+- Legendary abilities
+- Terrain effects
+- Weather effects
+- Equipment modifiers
+- Campaign modifiers
+- Complex trigger behaviors (only infrastructure)
+- Effect animations/visual effects
+- Effect sound effects
+- Effect tooltips with rich formatting
+- Effect categories/groups
+- Effect immunity/resistance
+- Effect interaction rules
+
+### Extension Points for Future Milestones
+
+- `EffectDefinition` can be extended with new effect types via JSON.
+- `EffectSystem` can support new stacking policies and trigger types.
+- `EffectInstance` can support complex modifier generation logic.
+- New trigger behaviors can be added without modifying existing code.
+- Abilities can apply effects via EffectSystem.apply_effect().
+- Equipment can apply effects via EffectSystem.apply_effect().
+- Terrain can apply effects via EffectSystem.apply_effect().
+- Effect events can be consumed by UI, analytics, achievements.
+- Debug display can be extended with more information.
+
 

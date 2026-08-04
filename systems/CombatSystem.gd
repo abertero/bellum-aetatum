@@ -3,13 +3,15 @@ extends Node
 
 var _command_dispatcher: CommandDispatcher
 var _affinity_rule_system: AffinityRuleSystem
+var _effect_system: EffectSystem = null
 var _attack_timers: Dictionary
 var _tracked_units: Array[UnitInstance] = []
 
 
-func initialize(command_dispatcher: CommandDispatcher, affinity_rule_system: AffinityRuleSystem) -> void:
+func initialize(command_dispatcher: CommandDispatcher, affinity_rule_system: AffinityRuleSystem, effect_system: EffectSystem = null) -> void:
 	_command_dispatcher = command_dispatcher
 	_affinity_rule_system = affinity_rule_system
+	_effect_system = effect_system
 	_attack_timers = {}
 	EventBus.unit_spawned.connect(_on_unit_spawned)
 	EventBus.unit_died.connect(_on_unit_died)
@@ -108,16 +110,28 @@ func _calculate_final_damage(action: DamageAction) -> int:
 	if action.target == null or not is_instance_valid(action.target):
 		return int(base_damage)
 	
+	var all_modifiers := CombatModifierCollection.new()
+	
 	var attacker_affinity: String = action.source.definition.affinity_id
 	var defender_affinity: String = action.target.definition.affinity_id
 	
-	if attacker_affinity == "" or defender_affinity == "":
+	if attacker_affinity != "" and defender_affinity != "":
+		var affinity_modifiers: CombatModifierCollection = _affinity_rule_system.get_attack_modifiers(attacker_affinity, defender_affinity)
+		all_modifiers.add_modifiers(affinity_modifiers.get_modifiers())
+	
+	if _effect_system != null:
+		var effect_attack_mods: Array[CombatModifier] = _effect_system.get_attack_modifiers(action.source)
+		all_modifiers.add_modifiers(effect_attack_mods)
+		var effect_defense_mods: Array[CombatModifier] = _effect_system.get_defense_modifiers(action.target)
+		all_modifiers.add_modifiers(effect_defense_mods)
+	
+	if all_modifiers.is_empty():
 		return int(base_damage)
 	
-	var attack_modifiers: CombatModifierCollection = _affinity_rule_system.get_attack_modifiers(attacker_affinity, defender_affinity)
-	var final_damage: float = attack_modifiers.apply_to(base_damage)
+	var final_damage: float = all_modifiers.apply_to(base_damage)
 	
-	EventBus.affinity_debug.emit(attacker_affinity, defender_affinity, attack_modifiers, int(final_damage))
+	if attacker_affinity != "" and defender_affinity != "":
+		EventBus.affinity_debug.emit(attacker_affinity, defender_affinity, all_modifiers, int(final_damage))
 	
 	return int(final_damage)
 

@@ -5,16 +5,23 @@ const UNIT_WIDTH: float = 64.0
 const UNIT_HEIGHT: float = 80.0
 const IMAGE_HEIGHT: float = 64.0
 const HP_BAR_HEIGHT: float = 6.0
+const EFFECT_ICON_SIZE: float = 12.0
+const EFFECT_ICON_SPACING: float = 2.0
 
 var _hp_bar_fill: ColorRect
 var _hp_label: Label
 var _previous_target: UnitInstance = null
+var _unit: UnitInstance = null
+var _effect_container: HBoxContainer = null
 
 
 func build_visuals(unit: UnitInstance) -> void:
+	_unit = unit
 	_build_debug_labels(unit)
 	_build_hp_bar(unit)
 	_build_unit_display(unit)
+	_build_effect_container(unit)
+	_connect_effect_signals()
 
 
 func get_hp_bar_fill() -> ColorRect:
@@ -136,3 +143,82 @@ func _update_target_label(current_target: UnitInstance) -> void:
 		target_label.text = "Target: %s" % current_target.definition.name
 	else:
 		target_label.text = "Target: None"
+
+
+func _build_effect_container(unit: UnitInstance) -> void:
+	_effect_container = HBoxContainer.new()
+	_effect_container.name = "EffectContainer"
+	_effect_container.position = Vector2(0.0, -76.0)
+	_effect_container.size = Vector2(UNIT_WIDTH, EFFECT_ICON_SIZE)
+	_effect_container.add_theme_constant_override("separation", int(EFFECT_ICON_SPACING))
+	unit.add_child(_effect_container)
+
+
+func _connect_effect_signals() -> void:
+	EventBus.effect_applied.connect(_on_effect_applied)
+	EventBus.effect_removed.connect(_on_effect_removed)
+	EventBus.effect_expired.connect(_on_effect_expired)
+	EventBus.effect_stack_changed.connect(_on_effect_stack_changed)
+
+
+func _on_effect_applied(effect: EffectInstance) -> void:
+	if effect.owner == _unit:
+		_refresh_effect_icons()
+
+
+func _on_effect_removed(effect: EffectInstance) -> void:
+	if effect.owner == _unit:
+		_refresh_effect_icons()
+
+
+func _on_effect_expired(effect: EffectInstance) -> void:
+	if effect.owner == _unit:
+		_refresh_effect_icons()
+
+
+func _on_effect_stack_changed(effect: EffectInstance) -> void:
+	if effect.owner == _unit:
+		_refresh_effect_icons()
+
+
+func _refresh_effect_icons() -> void:
+	if _effect_container == null:
+		return
+	for child in _effect_container.get_children():
+		child.queue_free()
+	if _unit == null:
+		return
+	var effects: Array[EffectInstance] = _get_unit_effects()
+	for effect in effects:
+		_create_effect_icon(effect)
+
+
+func _get_unit_effects() -> Array[EffectInstance]:
+	var result: Array[EffectInstance] = []
+	if _unit == null or _unit.active_effects == null:
+		return result
+	for entry in _unit.active_effects:
+		if entry is EffectInstance and entry.is_active():
+			result.append(entry)
+	return result
+
+
+func _create_effect_icon(effect: EffectInstance) -> void:
+	if _effect_container == null or effect.definition == null:
+		return
+	var icon := ColorRect.new()
+	icon.custom_minimum_size = Vector2(EFFECT_ICON_SIZE, EFFECT_ICON_SIZE)
+	icon.color = _get_effect_color(effect)
+	icon.tooltip_text = "%s\n%s\nStacks: %d" % [effect.definition.display_name, effect.definition.description, effect.stack_count]
+	_effect_container.add_child(icon)
+
+
+func _get_effect_color(effect: EffectInstance) -> Color:
+	if effect.definition == null:
+		return Color.GRAY
+	match effect.definition.visual_hint:
+		"buff":
+			return Color(0.2, 0.8, 0.2, 0.9)
+		"debuff":
+			return Color(0.8, 0.2, 0.2, 0.9)
+	return Color(0.6, 0.6, 0.6, 0.9)

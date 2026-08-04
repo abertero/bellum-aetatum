@@ -23,6 +23,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  TargetingSystem | CombatSystem | AttackSystem | DeckSystem      |
 |  EconomySystem | ProjectileSystem | CollisionSystem              |
 |  AffinityRegistry | AffinityRuleSystem                           |
+|  EffectRegistry | EffectLoader | EffectSystem                    |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -57,6 +58,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
 |  ResourceDefinition | ProjectileDefinition | AffinityDefinition  |
+|  EffectDefinition                                       |
 +------------------------------------------------------------------+
          |
          v
@@ -76,6 +78,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                         Data Layer                                |
 |  cards.json | player_deck.json | enemy_deck.json | stage_001.json|
 |  resources.json | projectiles.json | affinities.json             |
+|  effects.json                                                  |
 |  rules/affinity_rules.json                                       |
 +------------------------------------------------------------------+
 ```
@@ -101,6 +104,7 @@ Pure data containers that hold configuration parsed from JSON. No behavior, no m
 - **ResourceDefinition**: Resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from `data/resources/resources.json`.
 - **ProjectileDefinition**: Projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from `data/projectiles/projectiles.json`.
 - **AffinityDefinition**: Affinity properties (id, display_name, description, primary_color, icon, background). Loaded from `data/affinities.json`.
+- **EffectDefinition**: Effect properties (id, display_name, description, icon, duration, stacking_policy, refresh_policy, visual_hint, triggers, modifiers, metadata). Loaded from `data/effects.json`.
 
 ### Entities Layer
 
@@ -143,6 +147,12 @@ Runtime resource state for each team.
 
 - **ResourceInstance**: Tracks current value, generator level, and accumulated regeneration for a specific resource type. Handles regeneration logic with fractional accumulation. Emits events on changes.
 
+### Effects Layer
+
+Runtime effect state.
+
+- **EffectInstance**: Runtime effect object. Stores instance_id, definition, source, owner, remaining_duration, stack_count, state, metadata. Generates CombatModifier objects from definition data scaled by stack_count.
+
 ### Models Layer
 
 Attack model abstraction and registry.
@@ -180,13 +190,16 @@ Game logic systems that orchestrate behavior.
 - **SpatialQuerySystem**: Provides battlefield queries (frontline, units by owner/state, closest enemy, projectile collisions, units along path). Read-only — never modifies state.
 - **TargetingSystem**: Assigns targets to melee and ranged units based on SpatialQuerySystem queries.
 - **AttackSystem**: Executes attacks via AttackModelRegistry. Produces `DamageAction`. Emits `attack_started` and `attack_finished`.
-- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus. Handles both melee and ranged combat. Requests CombatModifierCollection from AffinityRuleSystem and applies modifiers to damage.
+- **CombatSystem**: Orchestrates combat timing, dispatches `AttackCommand`, consumes `DamageAction`, applies HP changes. Tracks units via EventBus. Handles both melee and ranged combat. Requests CombatModifierCollection from AffinityRuleSystem and EffectSystem, merges modifiers, and applies to damage.
 - **DeckSystem**: Loads card database and resolves deck lists from JSON.
 - **EconomySystem**: Manages resources for all teams. Handles regeneration, spending, and validation. Uses SimulationContext for time-based updates.
 - **ProjectileSystem**: Manages projectile movement and lifecycle. Uses SimulationContext for time-based updates. Emits `projectile_spawned`, `projectile_moved`, `projectile_destroyed`.
 - **CollisionSystem**: Detects projectile collisions with units. Produces `DamageAction` when collision occurs. Emits `projectile_collided`. Never modifies HP directly.
 - **AffinityRegistry**: Stores and provides lookup for affinity definitions. Validates uniqueness and provides query methods.
 - **AffinityRuleSystem**: Loads affinity rules from JSON, resolves attack and defense modifiers based on attacker/defender affinity pairs, and returns CombatModifierCollection objects.
+- **EffectRegistry**: Stores and provides lookup for effect definitions. Validates uniqueness and provides query methods.
+- **EffectLoader**: Static loader that reads effect definitions from JSON and populates the registry.
+- **EffectSystem**: Manages effect lifecycle: create, destroy, update durations, handle stacking, refresh, emit events, dispatch triggers. Generates CombatModifiers for units. Never modifies HP directly. Never updates UI.
 
 ### Factories Layer
 
@@ -272,6 +285,11 @@ ProjectileFactory    --[projectile_spawned]--> ProjectileSystem
 ProjectileSystem     --[projectile_moved]----> (future listeners)
 CollisionSystem      --[projectile_collided]-> (future listeners)
 ProjectileSystem     --[projectile_destroyed]> (future listeners)
+EffectSystem         --[effect_applied]-------> UnitVisualComponent, Debug UI
+EffectSystem         --[effect_removed]-------> UnitVisualComponent, Debug UI
+EffectSystem         --[effect_expired]-------> UnitVisualComponent, Debug UI
+EffectSystem         --[effect_refreshed]-----> UnitVisualComponent, Debug UI
+EffectSystem         --[effect_stack_changed]-> UnitVisualComponent, Debug UI
 ```
 
 ### Rules
