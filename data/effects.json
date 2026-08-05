@@ -5,18 +5,25 @@
       "display_name": "Strength",
       "description": "+10% attack damage",
       "icon": "",
-      "duration": 10.0,
       "stacking_policy": "STACK",
-      "refresh_policy": "REFRESH_DURATION",
       "visual_hint": "buff",
-      "triggers": ["OnApply", "OnRemove"],
-      "modifiers": [
+      "components": [
         {
-          "target": "attack",
-          "operation": "MULTIPLY",
-          "value": 1.1,
-          "priority": 100,
-          "description": "Strength: +10% attack"
+          "type": "DurationComponent",
+          "duration": 10.0,
+          "refresh_policy": "REFRESH_DURATION"
+        },
+        {
+          "type": "CombatModifierComponent",
+          "modifiers": [
+            {
+              "target": "attack",
+              "operation": "MULTIPLY",
+              "value": 1.1,
+              "priority": 100,
+              "description": "Strength: +10% attack"
+            }
+          ]
         }
       ],
       "metadata": {}
@@ -26,18 +33,25 @@
       "display_name": "Shield",
       "description": "-10% incoming damage",
       "icon": "",
-      "duration": 10.0,
       "stacking_policy": "STACK",
-      "refresh_policy": "REFRESH_DURATION",
       "visual_hint": "buff",
-      "triggers": ["OnApply", "OnRemove"],
-      "modifiers": [
+      "components": [
         {
-          "target": "defense",
-          "operation": "MULTIPLY",
-          "value": 0.9,
-          "priority": 100,
-          "description": "Shield: -10% incoming damage"
+          "type": "DurationComponent",
+          "duration": 10.0,
+          "refresh_policy": "REFRESH_DURATION"
+        },
+        {
+          "type": "CombatModifierComponent",
+          "modifiers": [
+            {
+              "target": "defense",
+              "operation": "MULTIPLY",
+              "value": 0.9,
+              "priority": 100,
+              "description": "Shield: -10% incoming damage"
+            }
+          ]
         }
       ],
       "metadata": {}

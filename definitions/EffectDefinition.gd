@@ -5,12 +5,9 @@ var id: String = ""
 var display_name: String = ""
 var description: String = ""
 var icon: String = ""
-var duration: float = 0.0
 var stacking_policy: String = "NO_STACK"
-var refresh_policy: String = "REFRESH_DURATION"
 var visual_hint: String = ""
-var triggers: Array[String] = []
-var modifiers: Array[Dictionary] = []
+var components: Array[Dictionary] = []
 var metadata: Dictionary = {}
 
 
@@ -20,21 +17,14 @@ static func from_dictionary(data: Dictionary) -> EffectDefinition:
 	definition.display_name = str(data.get("display_name", ""))
 	definition.description = str(data.get("description", ""))
 	definition.icon = str(data.get("icon", ""))
-	definition.duration = float(data.get("duration", 0.0))
 	definition.stacking_policy = str(data.get("stacking_policy", "NO_STACK"))
-	definition.refresh_policy = str(data.get("refresh_policy", "REFRESH_DURATION"))
 	definition.visual_hint = str(data.get("visual_hint", ""))
 
-	var triggers_data: Variant = data.get("triggers", [])
-	if triggers_data is Array:
-		for trigger in triggers_data:
-			definition.triggers.append(str(trigger))
-
-	var modifiers_data: Variant = data.get("modifiers", [])
-	if modifiers_data is Array:
-		for modifier in modifiers_data:
-			if modifier is Dictionary:
-				definition.modifiers.append(modifier.duplicate())
+	var components_data: Variant = data.get("components", [])
+	if components_data is Array:
+		for component in components_data:
+			if component is Dictionary:
+				definition.components.append(component.duplicate())
 
 	var metadata_data: Variant = data.get("metadata", {})
 	if metadata_data is Dictionary:

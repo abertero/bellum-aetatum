@@ -495,13 +495,15 @@ func _build_effect_debug_text() -> String:
 			continue
 		var effects: Array[EffectInstance] = _effect_system.get_effects_for_unit(unit)
 		for effect in effects:
-			var mods: Array[CombatModifier] = effect.get_attack_modifiers()
-			mods.append_array(effect.get_defense_modifiers())
-			text += "%s on %s | %.1fs | x%d | Mods: %d\n" % [
+			var mods: Array[CombatModifier] = effect.get_modifiers()
+			var remaining: float = effect.get_remaining_duration()
+			var component_count: int = effect.get_component_count()
+			text += "%s on %s | %.1fs | x%d | Components: %d | Mods: %d\n" % [
 				effect.definition.display_name,
 				unit.definition.name,
-				effect.remaining_duration,
+				remaining,
 				effect.stack_count,
+				component_count,
 				mods.size()
 			]
 	return text

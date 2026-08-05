@@ -52,8 +52,15 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |                      Resources Layer                              |
 |  ResourceInstance                                                 |
 +------------------------------------------------------------------+
-         |              |
-         v              v
+          |              |
+          v              v
++------------------------------------------------------------------+
+|                        Effects Layer                              |
+|  EffectInstance | EffectComponent | DurationComponent             |
+|  CombatModifierComponent                                          |
++------------------------------------------------------------------+
+          |              |
+          v              v
 +------------------------------------------------------------------+
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
@@ -149,9 +156,12 @@ Runtime resource state for each team.
 
 ### Effects Layer
 
-Runtime effect state.
+Runtime effect state and component-based behavior.
 
-- **EffectInstance**: Runtime effect object. Stores instance_id, definition, source, owner, remaining_duration, stack_count, state, metadata. Generates CombatModifier objects from definition data scaled by stack_count.
+- **EffectInstance**: Runtime effect object. Stores instance_id, definition, source, owner, stack_count, runtime_state, components. Delegates behavior to EffectComponent objects. Lightweight runtime container.
+- **EffectComponent**: Base interface for effect behavior components. Defines update(), get_modifiers(), is_expired() methods. Components are composed to create effect behaviors.
+- **DurationComponent**: Manages effect duration, expiration, and refresh policy. Stores remaining_time in runtime_state. Uses SimulationContext for time.
+- **CombatModifierComponent**: Generates CombatModifier objects from configuration. Supports all modifier operations (MULTIPLY, ADD, OVERRIDE, MIN, MAX) and stack scaling.
 
 ### Models Layer
 

@@ -34,10 +34,10 @@ func apply_effect(effect_id: String, owner: UnitInstance, effect_source: Variant
 	if existing != null:
 		return _handle_stacking(existing, definition)
 
-	var instance: EffectInstance = EffectInstance.create(definition, owner, effect_source, definition.duration)
+	var instance: EffectInstance = EffectInstance.create(definition, owner, effect_source)
+	instance.initialize_runtime()
 	_add_effect_to_tracking(instance)
 	EventBus.effect_applied.emit(instance)
-	_dispatch_trigger(instance, "OnApply")
 	return instance
 
 
@@ -45,7 +45,6 @@ func remove_effect(instance_id: String) -> void:
 	var instance: EffectInstance = _find_instance(instance_id)
 	if instance == null:
 		return
-	_dispatch_trigger(instance, "OnRemove")
 	instance.remove()
 	_remove_effect_from_tracking(instance)
 	EventBus.effect_removed.emit(instance)
@@ -72,30 +71,18 @@ func get_effects_for_unit(unit: UnitInstance) -> Array[EffectInstance]:
 	return result
 
 
-func get_attack_modifiers(unit: UnitInstance) -> Array[CombatModifier]:
-	return _collect_modifiers(unit, "attack")
-
-
-func get_defense_modifiers(unit: UnitInstance) -> Array[CombatModifier]:
-	return _collect_modifiers(unit, "defense")
+func get_modifiers(unit: UnitInstance) -> Array[CombatModifier]:
+	var result: Array[CombatModifier] = []
+	var effects: Array[EffectInstance] = get_effects_for_unit(unit)
+	for effect in effects:
+		var modifiers: Array[CombatModifier] = effect.get_modifiers()
+		for modifier in modifiers:
+			result.append(modifier)
+	return result
 
 
 func get_active_effect_count() -> int:
 	return _all_instances.size()
-
-
-func _collect_modifiers(unit: UnitInstance, target: String) -> Array[CombatModifier]:
-	var result: Array[CombatModifier] = []
-	var effects: Array[EffectInstance] = get_effects_for_unit(unit)
-	for effect in effects:
-		var modifiers: Array[CombatModifier] = []
-		if target == "attack":
-			modifiers = effect.get_attack_modifiers()
-		else:
-			modifiers = effect.get_defense_modifiers()
-		for modifier in modifiers:
-			result.append(modifier)
-	return result
 
 
 func _handle_stacking(existing: EffectInstance, definition: EffectDefinition) -> EffectInstance:
@@ -112,10 +99,10 @@ func _handle_stacking(existing: EffectInstance, definition: EffectDefinition) ->
 			return existing
 		"REPLACE":
 			remove_effect(existing.instance_id)
-			var instance: EffectInstance = EffectInstance.create(definition, existing.owner, existing.source, definition.duration)
+			var instance: EffectInstance = EffectInstance.create(definition, existing.owner, existing.source)
+			instance.initialize_runtime()
 			_add_effect_to_tracking(instance)
 			EventBus.effect_applied.emit(instance)
-			_dispatch_trigger(instance, "OnApply")
 			return instance
 	return existing
 
@@ -188,25 +175,12 @@ func _cleanup_expired_effects() -> void:
 
 
 func _on_unit_died(unit: UnitInstance) -> void:
-	_dispatch_trigger_for_unit(unit, "OnDeath")
 	remove_all_effects_from(unit)
 
 
-func _on_attack_started(attacker: UnitInstance, _target: UnitInstance) -> void:
-	_dispatch_trigger_for_unit(attacker, "OnAttack")
+func _on_attack_started(_attacker: UnitInstance, _target: UnitInstance) -> void:
+	pass
 
 
-func _on_action_performed(action: GameAction) -> void:
-	if action is DamageAction and action.target != null and is_instance_valid(action.target):
-		_dispatch_trigger_for_unit(action.target as UnitInstance, "OnReceiveDamage")
-
-
-func _dispatch_trigger_for_unit(unit: UnitInstance, trigger_name: String) -> void:
-	var effects: Array[EffectInstance] = get_effects_for_unit(unit)
-	for effect in effects:
-		_dispatch_trigger(effect, trigger_name)
-
-
-func _dispatch_trigger(effect: EffectInstance, trigger_name: String) -> void:
-	if effect.has_trigger(trigger_name):
-		pass
+func _on_action_performed(_action: GameAction) -> void:
+	pass

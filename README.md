@@ -28,7 +28,7 @@ res://
     models/              # Attack models and registry (AttackModel, MeleeAttackModel, RangedAttackModel, AttackModelRegistry, ProjectileDefinitionRegistry, CombatModifier, CombatModifierCollection)
     definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition, AffinityDefinition, EffectDefinition)
     factories/           # Object factories (UnitFactory, ProjectileFactory)
-    effects/             # Effect runtime (EffectInstance)
+    effects/             # Effect runtime (EffectInstance, EffectComponent, DurationComponent, CombatModifierComponent)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
@@ -158,7 +158,7 @@ Pure data containers parsed from JSON.
 | `ResourceDefinition` | RefCounted | Stores resource properties (id, display_name, maximum, starting_value, regeneration_rate). Loaded from resources.json. |
 | `ProjectileDefinition` | RefCounted | Stores projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from projectiles.json. |
 | `AffinityDefinition` | RefCounted | Stores affinity properties (id, display_name, description, primary_color, icon, background). Loaded from affinities.json. |
-| `EffectDefinition` | RefCounted | Stores effect properties (id, display_name, description, icon, duration, stacking_policy, refresh_policy, visual_hint, triggers, modifiers, metadata). Loaded from effects.json. |
+| `EffectDefinition` | RefCounted | Stores effect properties (id, display_name, description, icon, stacking_policy, visual_hint, components, metadata). Components define effect behavior through composition. Loaded from effects.json. |
 
 ### Factories
 
@@ -171,11 +171,14 @@ Object creation.
 
 ### Effects
 
-Runtime effect state.
+Runtime effect state and component-based behavior.
 
 | Class | Type | Responsibility |
 |---|---|---|
-| `EffectInstance` | RefCounted | Runtime effect state: instance_id, definition, source, owner, remaining_duration, stack_count, state. Generates CombatModifier objects from definition data. |
+| `EffectInstance` | RefCounted | Runtime effect state: instance_id, definition, source, owner, stack_count, runtime_state, components. Delegates behavior to EffectComponent objects. |
+| `EffectComponent` | RefCounted | Base interface for effect behavior components. Defines update(), get_modifiers(), is_expired() methods. |
+| `DurationComponent` | EffectComponent | Manages effect duration, expiration, and refresh policy. Stores remaining_time in runtime_state. |
+| `CombatModifierComponent` | EffectComponent | Generates CombatModifier objects from configuration. Supports all modifier operations and stack scaling. |
 
 ## EventBus
 

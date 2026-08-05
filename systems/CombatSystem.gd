@@ -120,10 +120,10 @@ func _calculate_final_damage(action: DamageAction) -> int:
 		all_modifiers.add_modifiers(affinity_modifiers.get_modifiers())
 	
 	if _effect_system != null:
-		var effect_attack_mods: Array[CombatModifier] = _effect_system.get_attack_modifiers(action.source)
-		all_modifiers.add_modifiers(effect_attack_mods)
-		var effect_defense_mods: Array[CombatModifier] = _effect_system.get_defense_modifiers(action.target)
-		all_modifiers.add_modifiers(effect_defense_mods)
+		var effect_mods: Array[CombatModifier] = _effect_system.get_modifiers(action.source)
+		all_modifiers.add_modifiers(effect_mods)
+		var defense_mods: Array[CombatModifier] = _effect_system.get_modifiers(action.target)
+		all_modifiers.add_modifiers(defense_mods)
 	
 	if all_modifiers.is_empty():
 		return int(base_damage)
