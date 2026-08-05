@@ -23,3 +23,18 @@ signal effect_removed(effect: EffectInstance)
 signal effect_expired(effect: EffectInstance)
 signal effect_refreshed(effect: EffectInstance)
 signal effect_stack_changed(effect: EffectInstance)
+signal ability_started(ability: AbilityInstance)
+signal ability_finished(ability: AbilityInstance)
+signal ability_cancelled(ability_id: String, owner: UnitInstance)
+signal ability_cooldown_started(ability_id: String, owner: UnitInstance, duration: float)
+signal ability_ready(ability_id: String, owner: UnitInstance)
+signal match_started
+signal match_paused
+signal match_resumed
+signal match_finished(winner: String, loser: String, elapsed_time: float)
+signal victory(winner: String, condition: String)
+signal defeat(loser: String, condition: String)
+signal draw(condition: String)
+signal countdown_started(duration: float)
+signal nexus_damaged(team: String, current_hp: int, max_hp: int)
+signal nexus_destroyed(team: String)

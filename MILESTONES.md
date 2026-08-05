@@ -2454,4 +2454,394 @@ Introduce a component-based Effect Engine where effects are compositions of reus
 - **Debug Display**: Can be extended to show component-specific information.
 - **Stacking Policies**: New policies can be added to EffectSystem without modifying components.
 
+---
+
+## Milestone 13 — Ability Composition Engine
+
+### Objective
+
+Introduce the Ability Composition Engine where abilities are compositions of reusable AbilityComponent objects. Abilities become fully data-driven through JSON configuration. The architecture follows Open/Closed Principle: new abilities are created by composing existing components in JSON, and new behaviors are added by creating new AbilityComponent subclasses.
+
+### What Was Implemented
+
+#### 1. AbilityDefinition
+
+- New `AbilityDefinition` class (`definitions/AbilityDefinition.gd`), extends `RefCounted`.
+- Pure data container for ability properties.
+- Fields: `id`, `display_name`, `description`, `icon`, `cooldown`, `activation`, `components`, `metadata`.
+- Components define ability behavior through composition.
+- Loaded from `data/abilities.json`.
+- Immutable after creation.
+
+#### 2. AbilityInstance
+
+- New `AbilityInstance` class (`abilities/AbilityInstance.gd`), extends `RefCounted`.
+- Runtime state for a single ability activation.
+- Fields: `instance_id`, `definition`, `owner`, `runtime_state`, `metadata`, `executed_components`, `generated_commands`.
+- Records execution details for debug purposes.
+- Created via static factory method `AbilityInstance.create()`.
+
+#### 3. AbilityComponent Base Interface
+
+- New `AbilityComponent` class (`abilities/AbilityComponent.gd`), extends `RefCounted`.
+- Base interface for all ability behavior components.
+- Defines: `initialize(config)`, `execute(caster, target, context) -> Array[GameCommand]`.
+- Components are composed to create ability behaviors.
+
+#### 4. ApplyEffectComponent
+
+- New `ApplyEffectComponent` class (`abilities/ApplyEffectComponent.gd`), extends `AbilityComponent`.
+- Delegates to `EffectSystem.apply_effect()`.
+- Reads `effect_id` and `target` mode from configuration.
+- Supports "self" and "target" target modes.
+- Reuses existing effect infrastructure entirely.
+
+#### 5. SpawnProjectileComponent
+
+- New `SpawnProjectileComponent` class (`abilities/SpawnProjectileComponent.gd`), extends `AbilityComponent`.
+- Delegates to `ProjectileFactory.create_projectile()`.
+- Reads `projectile_id` from configuration.
+- Resolves target from caster's current_target.
+- Reuses existing projectile infrastructure entirely.
+
+#### 6. GenerateCommandComponent
+
+- New `GenerateCommandComponent` class (`abilities/GenerateCommandComponent.gd`), extends `AbilityComponent`.
+- Creates `GameCommand` objects for `CommandDispatcher`.
+- Reads `command_type` from configuration.
+- Supports "attack" command type (creates AttackCommand).
+
+#### 7. AbilityRegistry
+
+- New `AbilityRegistry` class (`systems/AbilityRegistry.gd`), extends `RefCounted`.
+- Stores and provides lookup for ability definitions.
+- Validates uniqueness and provides query methods.
+- Follows established Registry pattern.
+
+#### 8. AbilityLoader
+
+- New `AbilityLoader` class (`systems/AbilityLoader.gd`), extends `RefCounted`.
+- Static loader that reads ability definitions from JSON.
+- Populates AbilityRegistry.
+- Follows established Loader pattern.
+
+#### 9. AbilitySystem
+
+- New `AbilitySystem` class (`systems/AbilitySystem.gd`), extends `Node`.
+- Manages ability execution, cooldown validation, component evaluation, command generation.
+- Uses SimulationContext for cooldown timing.
+- Never deals damage directly. Never modifies HP. Never updates UI.
+- Tracks cooldowns per owner per ability.
+- Emits ability events through EventBus.
+
+#### 10. Cooldown Management
+
+- Cooldowns tracked per owner per ability using SimulationContext.delta_time.
+- AbilitySystem validates cooldown before execution.
+- Emits `ability_cooldown_started` when cooldown begins.
+- Emits `ability_ready` when cooldown expires.
+- Cleans up references to freed units automatically.
+
+#### 11. EventBus Signals
+
+- `ability_started(ability: AbilityInstance)`
+- `ability_finished(ability: AbilityInstance)`
+- `ability_cancelled(ability_id: String, owner: UnitInstance)`
+- `ability_cooldown_started(ability_id: String, owner: UnitInstance, duration: float)`
+- `ability_ready(ability_id: String, owner: UnitInstance)`
+
+#### 12. UI Integration
+
+- Ability panel displays ability buttons from AbilityDefinition data.
+- Each button shows ability name and tooltip with description and cooldown.
+- Buttons show remaining cooldown when ability is on cooldown.
+- Buttons disabled when ability is on cooldown.
+- All data comes from AbilityDefinition (fully data-driven).
+
+#### 13. Debug Panel
+
+- Shows last ability execution details.
+- Displays: ability name, owner, executed components, generated commands.
+- Updates in real-time.
+
+#### 14. Initial Abilities
+
+- **Battle Cry**: ApplyEffectComponent applies "strength" effect to caster. Cooldown: 15s. Triggered automatically when player units spawn.
+- **Arrow Volley**: SpawnProjectileComponent spawns "arrow_basic" projectile at target. Cooldown: 8s. Available via ability panel button.
+
+#### 15. Component-Based JSON Structure
+
+```json
+{
+  "id": "battle_cry",
+  "display_name": "Battle Cry",
+  "cooldown": 15.0,
+  "activation": "instant",
+  "components": [
+    {
+      "type": "ApplyEffectComponent",
+      "effect_id": "strength",
+      "target": "self"
+    }
+  ]
+}
+```
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `definitions/AbilityDefinition.gd` | 35 | Pure data container for ability properties |
+| `abilities/AbilityInstance.gd` | 43 | Runtime state for ability activation |
+| `abilities/AbilityComponent.gd` | 14 | Base component interface |
+| `abilities/ApplyEffectComponent.gd` | 28 | Applies effects via EffectSystem |
+| `abilities/SpawnProjectileComponent.gd` | 33 | Spawns projectiles via ProjectileFactory |
+| `abilities/GenerateCommandComponent.gd` | 22 | Produces GameCommand objects |
+| `systems/AbilityRegistry.gd` | 38 | Stores and provides lookup for ability definitions |
+| `systems/AbilityLoader.gd` | 31 | Loads ability definitions from JSON |
+| `systems/AbilitySystem.gd` | 143 | Ability execution, cooldown, component evaluation |
+| `data/abilities.json` | 38 | Ability definitions (Battle Cry, Arrow Volley) |
+| `docs/adr/ADR-013-Ability-Composition-Engine.md` | 145 | Architecture Decision Record |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +5 signals | Added ability events |
+| `scenes/battle_scene.gd` | +100 lines | Setup AbilitySystem, ability UI panel, ability debug panel, demo triggers |
+| `README.md` | Updated | Added Ability Layer documentation |
+| `docs/Architecture.md` | Updated | Added Abilities Layer, signals, dependencies |
+| `MILESTONES.md` | Updated | Added Milestone 13, updated roadmap |
+
+### Ability Execution Flow
+
+```
+1. AbilitySystem.execute_ability(ability_id, caster, target)
+2. _can_execute() -> check registry, cooldown, valid caster
+3. _start_cooldown() -> track cooldown, emit ability_cooldown_started
+4. AbilityInstance.create(definition, caster)
+5. EventBus.ability_started.emit(instance)
+6. _evaluate_components():
+   a. For each component_data in definition.components:
+      i. _create_component(component_data) -> AbilityComponent
+      ii. component.execute(caster, target, context)
+      iii. instance.record_component(type)
+      iv. Collect returned commands
+7. _dispatch_commands(commands) -> CommandDispatcher.dispatch()
+8. EventBus.ability_finished.emit(instance)
+```
+
+### Architecture Improvements
+
+#### Single Responsibility Principle
+
+- **AbilityDefinition**: Only stores ability properties. No behavior.
+- **AbilityInstance**: Only records activation state. No execution logic.
+- **AbilityComponent**: Base interface. Each component has single responsibility.
+- **ApplyEffectComponent**: Only delegates to EffectSystem.
+- **SpawnProjectileComponent**: Only delegates to ProjectileFactory.
+- **GenerateCommandComponent**: Only creates commands.
+- **AbilitySystem**: Only manages execution and cooldowns. No damage, no HP, no UI.
+
+#### Open/Closed Principle
+
+- New abilities added via JSON without modifying code.
+- New ability behaviors added by creating new AbilityComponent subclasses.
+- Existing components remain unchanged.
+- AbilitySystem doesn't need changes for new ability types.
+
+#### Composition Over Inheritance
+
+- Abilities are compositions of AbilityComponent objects.
+- No inheritance hierarchy for ability types.
+- Components composed via JSON configuration.
+
+#### Dependency Inversion
+
+- AbilitySystem depends on AbilityComponent abstraction, not concrete components.
+- Components depend on context Dictionary, not specific system implementations.
+- UI depends on AbilityDefinition for display data, not hardcoded values.
+
+### SOLID Compliance
+
+| Principle | How |
+|---|---|
+| Single Responsibility | Each component has one responsibility. AbilitySystem manages execution and cooldowns. |
+| Open/Closed | New abilities added via JSON. New behaviors via new AbilityComponent subclasses. |
+| Liskov Substitution | Any AbilityComponent can be used interchangeably. |
+| Interface Segregation | Systems depend only on methods they use. |
+| Dependency Inversion | Systems depend on abstractions (AbilityComponent, AbilityDefinition). |
+
+### Architecture Rules Applied
+
+| Rule | How |
+|---|---|
+| Classes under 250 lines | All classes under 145 lines |
+| Functions under 30 lines | All functions under 20 lines |
+| Composition over inheritance | Abilities composed of AbilityComponent objects |
+| No duplicated logic | Components reuse EffectSystem, ProjectileFactory, CommandDispatcher |
+| Dependencies point inward | AbilitySystem -> AbilityComponent -> AbilityDefinition |
+| Open for Extension | New behaviors via new AbilityComponent subclasses |
+| Closed for Modification | Existing components and systems unchanged |
+
+### Behavior Changes
+
+- Player units automatically receive Battle Cry (Strength effect) on spawn
+- Ability panel shows available abilities with cooldown status
+- Abilities can be triggered via ability panel buttons
+- Debug panel shows last ability execution details
+- Cooldowns prevent ability spam
+
+### Existing Gameplay Preserved
+
+- CombatSystem remains the only system that modifies HP
+- Core combat flow unchanged
+- Effect system unchanged
+- Projectile system unchanged
+- Unit spawning unchanged
+- Formation unchanged
+- Targeting unchanged
+- Death unchanged
+- Movement unchanged
+- Economy unchanged
+
+### What Was NOT Implemented (Intentionally)
+
+- Legendary abilities
+- Ultimate abilities
+- Terrain abilities
+- Weather abilities
+- Passive aura system
+- Chain abilities
+- Campaign scripting
+- SpawnUnitComponent
+- TeleportComponent
+- ResourceComponent
+- AnimationComponent
+- SoundComponent
+- AreaComponent
+- TargetFilterComponent
+- ConditionalComponent
+- DelayComponent
+- ChainComponent
+- RandomComponent
+- Ability animations/visual effects
+- Ability sound effects
+- Ability categories/groups
+- Ability prerequisites
+- Ability upgrades
+
+### Extension Points for Future Milestones
+
+- **New Ability Components**: Create new AbilityComponent subclasses (SpawnUnitComponent, TeleportComponent, AreaComponent, etc.)
+- **New Abilities via JSON**: Compose existing components in new ways via `data/abilities.json`. No code changes required.
+- **AI Integration**: AI can call AbilitySystem.execute_ability() using the same interface.
+- **Ability Triggers**: Future milestones can add automatic triggers (on unit spawn, on kill, on damage taken).
+- **Component Composition**: Mix and match components to create complex abilities.
+- **Event Consumption**: Ability events can be consumed by UI, analytics, achievements.
+- **Debug Display**: Can be extended to show component-specific information.
+
+---
+
+## Milestone 14 — Match Flow Engine
+
+### Objective
+
+Introduce the Match Flow Engine with explicit match lifecycle management, pluggable victory conditions, and an Ability Pipeline abstraction. Gameplay systems remain independent from match state. All match rules are data-driven from JSON.
+
+### What Was Implemented
+
+#### 1. MatchState
+
+- New `MatchState` class (`core/MatchState.gd`), extends `RefCounted`.
+- Enum defining match lifecycle states: LOADING, INITIALIZING, COUNTDOWN, RUNNING, PAUSED, VICTORY, DEFEAT, DRAW, FINISHED.
+- Provides `to_str(state)` for display and `is_terminal(state)` for completion checks.
+
+#### 2. MatchFlowSystem
+
+- New `MatchFlowSystem` class (`systems/MatchFlowSystem.gd`), extends `Node`.
+- Manages match lifecycle: state transitions, countdown, pause/resume, victory/defeat detection.
+- Tracks elapsed match time (separate from SimulationContext global time).
+- Evaluates pluggable victory conditions each frame during RUNNING state.
+- Pauses SimulationContext during PAUSED and terminal states.
+- Never modifies gameplay directly. Only reads state and emits events.
+
+#### 3. MatchRulesDefinition
+
+- New `MatchRulesDefinition` class (`definitions/MatchRulesDefinition.gd`), extends `RefCounted`.
+- Pure data container: `countdown_duration`, `time_limit`, `nexus_hp`, `victory_conditions`.
+- Loaded from `data/match_rules.json`.
+
+#### 4. NexusState
+
+- New `NexusState` class (`entities/NexusState.gd`), extends `RefCounted`.
+- Runtime state for a team's base HP.
+- Provides: `is_alive()`, `take_damage()`, `get_hp_ratio()`.
+
+#### 5. NexusSystem
+
+- New `NexusSystem` class (`systems/NexusSystem.gd`), extends `RefCounted`.
+- Manages NexusState for each team. Emits `nexus_damaged` and `nexus_destroyed` events.
+
+#### 6. Match Conditions
+
+- **MatchCondition**: Base interface with `check(context) -> bool`.
+- **DestroyEnemyNexusCondition**: Enemy nexus HP <= 0.
+- **DestroyPlayerNexusCondition**: Player nexus HP <= 0.
+- **TimeLimitCondition**: Elapsed match time >= configured limit.
+
+#### 7. Ability Pipeline
+
+- **AbilityPipeline**: Ordered list of AbilityPipelineNode objects.
+- **AbilityPipelineNode**: Wraps component execution or future node types.
+- **AbilityPipelineExecutor**: Executes nodes sequentially, collects commands.
+- Backward compatible: existing `components` arrays auto-migrate to sequential pipelines.
+
+#### 8. Match Events
+
+- `match_started`, `match_paused`, `match_resumed`, `match_finished`
+- `victory`, `defeat`, `draw`, `countdown_started`
+- `nexus_damaged`, `nexus_destroyed`
+
+#### 9. Match UI
+
+- Match state label, countdown label, result label
+- "Damage Enemy Nexus" button for demo
+- Debug panel with match state, elapsed time, nexus HP
+
+#### 10. Gameplay Gating
+
+- Card playing, enemy spawning, ability triggers all gated on RUNNING state
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `core/MatchState.gd` | 36 | Match state enum |
+| `definitions/MatchRulesDefinition.gd` | 17 | Match rules data |
+| `entities/NexusState.gd` | 19 | Nexus HP tracking |
+| `conditions/MatchCondition.gd` | 10 | Base condition interface |
+| `conditions/DestroyEnemyNexusCondition.gd` | 12 | Enemy nexus check |
+| `conditions/DestroyPlayerNexusCondition.gd` | 12 | Player nexus check |
+| `conditions/TimeLimitCondition.gd` | 11 | Time limit check |
+| `pipelines/AbilityPipeline.gd` | 21 | Node list |
+| `pipelines/AbilityPipelineNode.gd` | 16 | Node wrapper |
+| `pipelines/AbilityPipelineExecutor.gd` | 45 | Sequential executor |
+| `systems/MatchFlowSystem.gd` | 128 | Match lifecycle |
+| `systems/NexusSystem.gd` | 25 | Nexus management |
+| `data/match_rules.json` | 14 | Match rules config |
+| `docs/adr/ADR-014-Match-Flow-Engine.md` | 165 | ADR |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +10 signals | Match and nexus events |
+| `definitions/AbilityDefinition.gd` | Rewritten | Pipeline support |
+| `systems/AbilitySystem.gd` | Rewritten | Pipeline executor |
+| `scenes/battle_scene.gd` | +130 lines | Match integration |
+| `README.md` | Updated | Match Flow docs |
+| `docs/Architecture.md` | Updated | New layers and signals |
+| `MILESTONES.md` | Updated | Milestone 14, roadmap |
+
 

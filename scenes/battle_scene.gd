@@ -35,11 +35,26 @@ var _affinity_debug_panel: PanelContainer = null
 var _affinity_debug_label: Label = null
 var _effect_debug_panel: PanelContainer = null
 var _effect_debug_label: Label = null
+var _ability_registry: AbilityRegistry = null
+var _ability_system: AbilitySystem = null
+var _ability_panel: PanelContainer = null
+var _ability_debug_panel: PanelContainer = null
+var _ability_debug_label: Label = null
+var _match_rules: MatchRulesDefinition = null
+var _match_flow_system: MatchFlowSystem = null
+var _nexus_system: NexusSystem = null
+var _match_state_label: Label = null
+var _countdown_label: Label = null
+var _result_label: Label = null
+var _match_debug_label: Label = null
+var _nexus_hp_labels: Dictionary = {}
 
 
 func _ready() -> void:
 	_load_stage()
 	_setup_simulation_context()
+	_setup_match_rules()
+	_setup_nexus_system()
 	_setup_battlefield()
 	_setup_spawn_system()
 	_setup_formation_system()
@@ -53,31 +68,45 @@ func _ready() -> void:
 	_setup_affinity_rule_system()
 	_setup_effect_registry()
 	_setup_effect_system()
+	_setup_ability_registry()
 	_setup_economy_system()
 	_setup_command_dispatcher()
+	_setup_ability_system()
 	_setup_combat_system()
+	_setup_match_flow_system()
 	_load_decks()
 	_create_card_buttons()
 	_setup_debug_panel()
 	_setup_resource_panel()
 	_setup_affinity_debug_panel()
 	_setup_effect_debug_panel()
-	EventBus.battle_started.emit()
-	EventBus.affinity_debug.connect(_on_affinity_debug)
-	EventBus.effect_applied.connect(_on_effect_changed)
-	EventBus.effect_removed.connect(_on_effect_changed)
-	EventBus.effect_expired.connect(_on_effect_changed)
-	EventBus.effect_stack_changed.connect(_on_effect_changed)
-	EventBus.unit_spawned.connect(_on_unit_spawned_for_effects)
+	_setup_ability_panel()
+	_setup_ability_debug_panel()
+	_setup_match_ui()
+	_setup_match_debug_panel()
+	_connect_signals()
+	_match_flow_system.start_match()
 
 
 func _physics_process(delta: float) -> void:
 	_simulation_context.update(delta)
-	_update_enemy_spawn_timer(delta)
+	if _is_match_running():
+		_update_enemy_spawn_timer(delta)
 	_update_debug_panel()
 	_update_resource_panel()
 	_update_card_affordability()
 	_update_effect_debug_panel()
+	_update_ability_debug_panel()
+	_update_ability_panel()
+	_update_match_ui()
+	_update_match_debug_panel()
+	_update_nexus_display()
+
+
+func _is_match_running() -> bool:
+	if _match_flow_system == null:
+		return false
+	return _match_flow_system.get_current_state() == MatchState.State.RUNNING
 
 
 func _update_enemy_spawn_timer(delta: float) -> void:
@@ -301,6 +330,8 @@ func _create_label(text: String) -> Label:
 
 
 func _on_card_pressed(card_def: UnitDefinition) -> void:
+	if not _is_match_running():
+		return
 	var spawn_pos: Vector2 = _stage_definition.player_spawn_position
 	var position := Vector2(spawn_pos.x, spawn_pos.y)
 	position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
@@ -517,3 +548,284 @@ func _get_all_tracked_units() -> Array[UnitInstance]:
 		if child is UnitInstance:
 			result.append(child)
 	return result
+
+
+func _setup_ability_registry() -> void:
+	_ability_registry = AbilityRegistry.new()
+	AbilityLoader.load_abilities(_ability_registry, "res://data/abilities.json")
+
+
+func _setup_ability_system() -> void:
+	_ability_system = AbilitySystem.new()
+	_ability_system.initialize(_ability_registry, _simulation_context)
+	_ability_system.set_effect_system(_effect_system)
+	_ability_system.set_projectile_registry(_projectile_registry)
+	_ability_system.set_command_dispatcher(_command_dispatcher)
+	_ability_system.set_parent_node(_unit_container)
+	add_child(_ability_system)
+
+
+func _setup_ability_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_ability_panel = PanelContainer.new()
+	_ability_panel.name = "AbilityPanel"
+	_ability_panel.position = Vector2(380.0, 10.0)
+	_ability_panel.custom_minimum_size = Vector2(200.0, 100.0)
+	canvas_layer.add_child(_ability_panel)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_ability_panel.add_child(vbox)
+	var title := Label.new()
+	title.text = "Abilities"
+	title.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(title)
+	for ability_def in _ability_registry.get_all_abilities():
+		var btn := Button.new()
+		btn.text = ability_def.display_name
+		btn.tooltip_text = "%s\nCooldown: %.1fs\n%s" % [ability_def.display_name, ability_def.cooldown, ability_def.description]
+		btn.pressed.connect(_on_ability_button_pressed.bind(ability_def.id))
+		vbox.add_child(btn)
+
+
+func _setup_ability_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_ability_debug_panel = PanelContainer.new()
+	_ability_debug_panel.name = "AbilityDebugPanel"
+	_ability_debug_panel.position = Vector2(10.0, 340.0)
+	_ability_debug_panel.custom_minimum_size = Vector2(300.0, 100.0)
+	canvas_layer.add_child(_ability_debug_panel)
+	_ability_debug_label = Label.new()
+	_ability_debug_label.name = "AbilityDebugLabel"
+	_ability_debug_label.add_theme_font_size_override("font_size", 10)
+	_ability_debug_panel.add_child(_ability_debug_label)
+	_ability_debug_label.text = "Abilities: Waiting..."
+
+
+func _on_ability_button_pressed(ability_id: String) -> void:
+	if not _is_match_running():
+		return
+	var player_units: Array[UnitInstance] = _get_all_tracked_units()
+	for unit in player_units:
+		if unit.is_alive() and unit.unit_owner == "player":
+			_ability_system.execute_ability(ability_id, unit)
+			return
+
+
+func _on_unit_spawned_for_abilities(unit: UnitInstance) -> void:
+	if _ability_system == null or unit.unit_owner != "player":
+		return
+	if not _is_match_running():
+		return
+	_ability_system.execute_ability("battle_cry", unit)
+
+
+func _on_ability_event(_ability: AbilityInstance) -> void:
+	pass
+
+
+func _update_ability_panel() -> void:
+	if _ability_panel == null or _ability_system == null:
+		return
+	var vbox: VBoxContainer = _ability_panel.get_child(0)
+	var buttons: Array = vbox.get_children()
+	for i in range(1, buttons.size()):
+		var btn: Button = buttons[i]
+		var ability_def: AbilityDefinition = _ability_registry.get_all_abilities()[i - 1]
+		var player_units: Array[UnitInstance] = _get_all_tracked_units()
+		var first_unit: UnitInstance = null
+		for unit in player_units:
+			if unit.is_alive() and unit.unit_owner == "player":
+				first_unit = unit
+				break
+		if first_unit == null:
+			btn.disabled = true
+			continue
+		var remaining: float = _ability_system.get_remaining_cooldown(ability_def.id, first_unit)
+		if remaining > 0.0:
+			btn.text = "%s (%.1fs)" % [ability_def.display_name, remaining]
+			btn.disabled = true
+		else:
+			btn.text = ability_def.display_name
+			btn.disabled = false
+
+
+func _update_ability_debug_panel() -> void:
+	if _ability_debug_label == null or _ability_system == null:
+		return
+	var execution: AbilityInstance = _ability_system.get_last_execution()
+	if execution == null:
+		_ability_debug_label.text = "Abilities: No execution yet"
+		return
+	var text: String = "Last Ability: %s\n" % execution.definition.display_name
+	text += "Owner: %s\n" % (execution.owner.definition.name if execution.owner != null else "None")
+	text += "Components: %d\n" % execution.get_component_count()
+	for comp_type in execution.executed_components:
+		text += "  - %s\n" % comp_type
+	text += "Commands: %d\n" % execution.get_command_count()
+	_ability_debug_label.text = text
+
+
+func _setup_match_rules() -> void:
+	var data: Variant = JsonLoader.load_json("res://data/match_rules.json")
+	if data != null and data is Dictionary:
+		_match_rules = MatchRulesDefinition.from_dictionary(data)
+	else:
+		_match_rules = MatchRulesDefinition.new()
+
+
+func _setup_nexus_system() -> void:
+	_nexus_system = NexusSystem.new()
+	_nexus_system.initialize(_match_rules.nexus_hp)
+
+
+func _setup_match_flow_system() -> void:
+	_match_flow_system = MatchFlowSystem.new()
+	_match_flow_system.initialize(_match_rules, _simulation_context)
+	_match_flow_system.set_nexus_system(_nexus_system)
+	add_child(_match_flow_system)
+
+
+func _connect_signals() -> void:
+	EventBus.affinity_debug.connect(_on_affinity_debug)
+	EventBus.effect_applied.connect(_on_effect_changed)
+	EventBus.effect_removed.connect(_on_effect_changed)
+	EventBus.effect_expired.connect(_on_effect_changed)
+	EventBus.effect_stack_changed.connect(_on_effect_changed)
+	EventBus.unit_spawned.connect(_on_unit_spawned_for_effects)
+	EventBus.unit_spawned.connect(_on_unit_spawned_for_abilities)
+	EventBus.ability_started.connect(_on_ability_event)
+	EventBus.ability_finished.connect(_on_ability_event)
+	EventBus.match_started.connect(_on_match_started)
+	EventBus.match_paused.connect(_on_match_paused)
+	EventBus.match_resumed.connect(_on_match_resumed)
+	EventBus.match_finished.connect(_on_match_finished)
+	EventBus.victory.connect(_on_victory)
+	EventBus.defeat.connect(_on_defeat)
+	EventBus.draw.connect(_on_draw)
+	EventBus.countdown_started.connect(_on_countdown_started)
+
+
+func _setup_match_ui() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	var match_panel := PanelContainer.new()
+	match_panel.name = "MatchUIPanel"
+	match_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	match_panel.offset_top = 50.0
+	match_panel.offset_bottom = 120.0
+	match_panel.offset_left = -100.0
+	match_panel.offset_right = 100.0
+	canvas_layer.add_child(match_panel)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	match_panel.add_child(vbox)
+	_match_state_label = Label.new()
+	_match_state_label.name = "MatchStateLabel"
+	_match_state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_match_state_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(_match_state_label)
+	_countdown_label = Label.new()
+	_countdown_label.name = "CountdownLabel"
+	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_countdown_label.add_theme_font_size_override("font_size", 24)
+	_countdown_label.add_theme_color_override("font_color", Color.YELLOW)
+	vbox.add_child(_countdown_label)
+	_result_label = Label.new()
+	_result_label.name = "ResultLabel"
+	_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_result_label.add_theme_font_size_override("font_size", 20)
+	_result_label.visible = false
+	vbox.add_child(_result_label)
+	var nexus_btn := Button.new()
+	nexus_btn.text = "Damage Enemy Nexus"
+	nexus_btn.pressed.connect(_on_damage_enemy_nexus)
+	vbox.add_child(nexus_btn)
+
+
+func _setup_match_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	var panel := PanelContainer.new()
+	panel.name = "MatchDebugPanel"
+	panel.position = Vector2(590.0, 10.0)
+	panel.custom_minimum_size = Vector2(200.0, 120.0)
+	canvas_layer.add_child(panel)
+	_match_debug_label = Label.new()
+	_match_debug_label.name = "MatchDebugLabel"
+	_match_debug_label.add_theme_font_size_override("font_size", 10)
+	panel.add_child(_match_debug_label)
+	_match_debug_label.text = "Match: Loading..."
+
+
+func _on_match_started() -> void:
+	_countdown_label.visible = false
+
+
+func _on_match_paused() -> void:
+	_match_state_label.text = "PAUSED"
+
+
+func _on_match_resumed() -> void:
+	pass
+
+
+func _on_match_finished(_winner: String, _loser: String, _elapsed: float) -> void:
+	pass
+
+
+func _on_victory(winner: String, condition: String) -> void:
+	_result_label.text = "VICTORY!\n%s" % condition
+	_result_label.add_theme_color_override("font_color", Color.GREEN)
+	_result_label.visible = true
+
+
+func _on_defeat(_loser: String, condition: String) -> void:
+	_result_label.text = "DEFEAT\n%s" % condition
+	_result_label.add_theme_color_override("font_color", Color.RED)
+	_result_label.visible = true
+
+
+func _on_draw(condition: String) -> void:
+	_result_label.text = "DRAW\n%s" % condition
+	_result_label.add_theme_color_override("font_color", Color.YELLOW)
+	_result_label.visible = true
+
+
+func _on_countdown_started(duration: float) -> void:
+	_countdown_label.text = "%.0f" % duration
+	_countdown_label.visible = true
+
+
+func _on_damage_enemy_nexus() -> void:
+	if not _is_match_running():
+		return
+	_nexus_system.damage_nexus("enemy", 25)
+
+
+func _update_match_ui() -> void:
+	if _match_flow_system == null:
+		return
+	var state: int = _match_flow_system.get_current_state()
+	_match_state_label.text = MatchState.to_str(state)
+	if state == MatchState.State.COUNTDOWN:
+		var remaining: float = _match_flow_system.get_countdown_remaining()
+		_countdown_label.text = "%.0f" % ceil(remaining)
+		_countdown_label.visible = true
+	else:
+		_countdown_label.visible = false
+
+
+func _update_match_debug_panel() -> void:
+	if _match_debug_label == null or _match_flow_system == null:
+		return
+	var text: String = "Match State: %s\n" % MatchState.to_str(_match_flow_system.get_current_state())
+	text += "Elapsed: %.1fs\n" % _match_flow_system.get_elapsed_match_time()
+	text += "Player Nexus: %d%%\n" % int(_nexus_system.get_hp_ratio("player") * 100.0)
+	text += "Enemy Nexus: %d%%\n" % int(_nexus_system.get_hp_ratio("enemy") * 100.0)
+	var execution: AbilityInstance = _ability_system.get_last_execution() if _ability_system else null
+	if execution != null:
+		text += "Pipeline: %s\n" % execution.definition.display_name
+		text += "Nodes: %d\n" % execution.get_component_count()
+	_match_debug_label.text = text
+
+
+func _update_nexus_display() -> void:
+	pass

@@ -24,6 +24,8 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  EconomySystem | ProjectileSystem | CollisionSystem              |
 |  AffinityRegistry | AffinityRuleSystem                           |
 |  EffectRegistry | EffectLoader | EffectSystem                    |
+|  AbilityRegistry | AbilityLoader | AbilitySystem                  |
+|  MatchFlowSystem | NexusSystem                                      |
 +------------------------------------------------------------------+
          |              |              |
          v              v              v
@@ -44,7 +46,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 +------------------------------------------------------------------+
 |                       Entities Layer                              |
 |  UnitInstance | BattleGroup | UnitVisualComponent                |
-|  ProjectileInstance                                               |
+|  ProjectileInstance | NexusState                                   |
 +------------------------------------------------------------------+
          |              |
          v              v
@@ -59,19 +61,41 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  EffectInstance | EffectComponent | DurationComponent             |
 |  CombatModifierComponent                                          |
 +------------------------------------------------------------------+
-          |              |
-          v              v
+           |              |
+           v              v
++------------------------------------------------------------------+
+|                       Abilities Layer                             |
+|  AbilityInstance | AbilityComponent | ApplyEffectComponent       |
+|  SpawnProjectileComponent | GenerateCommandComponent             |
++------------------------------------------------------------------+
+            |              |
+            v              v
++------------------------------------------------------------------+
+|                       Pipelines Layer                             |
+|  AbilityPipeline | AbilityPipelineNode | AbilityPipelineExecutor |
++------------------------------------------------------------------+
+            |              |
+            v              v
++------------------------------------------------------------------+
+|                      Conditions Layer                             |
+|  MatchCondition | DestroyEnemyNexusCondition                     |
+|  DestroyPlayerNexusCondition | TimeLimitCondition                |
++------------------------------------------------------------------+
+           |              |
+           v              v
 +------------------------------------------------------------------+
 |                     Definitions Layer                             |
 |  UnitDefinition | StageDefinition | DeckDefinition               |
 |  ResourceDefinition | ProjectileDefinition | AffinityDefinition  |
 |  EffectDefinition                                       |
+|  AbilityDefinition | MatchRulesDefinition               |
 +------------------------------------------------------------------+
          |
          v
 +------------------------------------------------------------------+
 |                         Core Layer                                |
 |  EventBus | JsonLoader | UnitState | SimulationContext            |
+|  MatchState                                                       |
 +------------------------------------------------------------------+
          |
          v
@@ -86,6 +110,8 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  cards.json | player_deck.json | enemy_deck.json | stage_001.json|
 |  resources.json | projectiles.json | affinities.json             |
 |  effects.json                                                  |
+|  abilities.json                                                |
+|  match_rules.json                                              |
 |  rules/affinity_rules.json                                       |
 +------------------------------------------------------------------+
 ```
@@ -100,6 +126,7 @@ Autoloaded singletons and infrastructure services available globally.
 - **JsonLoader**: Reads JSON files from disk and returns parsed data. Has no knowledge of game concepts.
 - **UnitState**: Enum defining unit states (MOVING, WAITING, BLOCKED, ATTACKING, DEAD) and string conversion utility.
 - **SimulationContext**: Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides a consistent time source for all systems. Updated by BattleScene in `_physics_process()`. Never queries engine clock directly. Future: will support fixed timestep, replay, time scaling, pause, slow motion, deterministic multiplayer.
+- **MatchState**: Enum defining match lifecycle states (LOADING, INITIALIZING, COUNTDOWN, RUNNING, PAUSED, VICTORY, DEFEAT, DRAW, FINISHED) and string conversion utility.
 
 ### Definitions Layer
 
@@ -112,6 +139,8 @@ Pure data containers that hold configuration parsed from JSON. No behavior, no m
 - **ProjectileDefinition**: Projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from `data/projectiles/projectiles.json`.
 - **AffinityDefinition**: Affinity properties (id, display_name, description, primary_color, icon, background). Loaded from `data/affinities.json`.
 - **EffectDefinition**: Effect properties (id, display_name, description, icon, duration, stacking_policy, refresh_policy, visual_hint, triggers, modifiers, metadata). Loaded from `data/effects.json`.
+- **AbilityDefinition**: Ability properties (id, display_name, description, icon, cooldown, activation, pipeline, metadata). Pipeline defines ability execution through sequential node composition. Loaded from `data/abilities.json`.
+- **MatchRulesDefinition**: Match rules (countdown_duration, time_limit, nexus_hp, victory_conditions). Loaded from `data/match_rules.json`.
 
 ### Entities Layer
 
@@ -121,6 +150,7 @@ Runtime game objects that exist in the scene tree.
 - **BattleGroup**: Organizes units into ordered player/enemy formations. Provides frontline lookup.
 - **UnitVisualComponent**: Handles all visual building and updates (HP bar, labels, target display).
 - **ProjectileInstance**: Represents a projectile in flight. Owns position, direction, speed, owner, target, remaining_distance. Handles movement and collision detection. Supports optional debug rendering.
+- **NexusState**: Tracks base HP for a team. Provides `is_alive()`, `take_damage()`, `get_hp_ratio()`. Created by NexusSystem.
 
 #### UnitInstance State Transitions
 
@@ -210,6 +240,38 @@ Game logic systems that orchestrate behavior.
 - **EffectRegistry**: Stores and provides lookup for effect definitions. Validates uniqueness and provides query methods.
 - **EffectLoader**: Static loader that reads effect definitions from JSON and populates the registry.
 - **EffectSystem**: Manages effect lifecycle: create, destroy, update durations, handle stacking, refresh, emit events, dispatch triggers. Generates CombatModifiers for units. Never modifies HP directly. Never updates UI.
+- **AbilityRegistry**: Stores and provides lookup for ability definitions. Validates uniqueness and provides query methods.
+- **AbilityLoader**: Static loader that reads ability definitions from JSON and populates the registry.
+- **AbilitySystem**: Manages ability execution, cooldown validation, component evaluation, and command generation. Uses SimulationContext for cooldown timing. Never deals damage directly. Never modifies HP. Never updates UI.
+- **MatchFlowSystem**: Manages match lifecycle (state transitions, countdown, pause/resume, victory/defeat detection). Evaluates pluggable victory conditions from JSON. Uses SimulationContext for time. Pauses simulation during non-RUNNING states. Never modifies gameplay directly.
+- **NexusSystem**: Manages base HP for each team. Provides damage_nexus() API. Emits nexus_damaged and nexus_destroyed events. Read by MatchFlowSystem for victory evaluation.
+
+### Abilities Layer
+
+Runtime ability state and component-based behavior.
+
+- **AbilityInstance**: Runtime ability activation object. Stores instance_id, definition, owner, runtime_state, executed_components, generated_commands. Records execution details for debug purposes.
+- **AbilityComponent**: Base interface for ability behavior components. Defines execute() method that returns GameCommand array. Components are composed to create ability behaviors.
+- **ApplyEffectComponent**: Delegates to EffectSystem.apply_effect(). Reuses existing effect infrastructure.
+- **SpawnProjectileComponent**: Delegates to ProjectileFactory.create_projectile(). Reuses existing projectile infrastructure.
+- **GenerateCommandComponent**: Creates GameCommand objects for CommandDispatcher dispatch.
+
+### Pipelines Layer
+
+Ability execution pipeline abstraction.
+
+- **AbilityPipeline**: Ordered list of AbilityPipelineNode objects. Created from JSON or auto-migrated from component arrays for backward compatibility.
+- **AbilityPipelineNode**: Wraps a component execution or future node type (delay, condition, branch). Data-driven from JSON.
+- **AbilityPipelineExecutor**: Executes pipeline nodes sequentially. Creates components from node data, collects GameCommand results.
+
+### Conditions Layer
+
+Pluggable match victory/defeat conditions.
+
+- **MatchCondition**: Base interface for match conditions. Defines `check(context) -> bool` and `get_description() -> String`.
+- **DestroyEnemyNexusCondition**: Checks if enemy nexus HP <= 0.
+- **DestroyPlayerNexusCondition**: Checks if player nexus HP <= 0.
+- **TimeLimitCondition**: Checks if elapsed match time >= configured limit.
 
 ### Factories Layer
 
@@ -300,6 +362,20 @@ EffectSystem         --[effect_removed]-------> UnitVisualComponent, Debug UI
 EffectSystem         --[effect_expired]-------> UnitVisualComponent, Debug UI
 EffectSystem         --[effect_refreshed]-----> UnitVisualComponent, Debug UI
 EffectSystem         --[effect_stack_changed]-> UnitVisualComponent, Debug UI
+AbilitySystem        --[ability_started]-------> Debug UI
+AbilitySystem        --[ability_finished]------> Debug UI
+AbilitySystem        --[ability_cooldown_started] Ability UI
+AbilitySystem        --[ability_ready]---------> Ability UI
+MatchFlowSystem      --[match_started]---------> BattleScene
+MatchFlowSystem      --[match_paused]----------> BattleScene
+MatchFlowSystem      --[match_resumed]---------> BattleScene
+MatchFlowSystem      --[match_finished]--------> BattleScene
+MatchFlowSystem      --[victory]---------------> BattleScene
+MatchFlowSystem      --[defeat]----------------> BattleScene
+MatchFlowSystem      --[draw]------------------> BattleScene
+MatchFlowSystem      --[countdown_started]-----> BattleScene
+NexusSystem          --[nexus_damaged]---------> BattleScene
+NexusSystem          --[nexus_destroyed]-------> MatchFlowSystem
 ```
 
 ### Rules

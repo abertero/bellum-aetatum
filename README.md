@@ -19,16 +19,19 @@ Everything in the game should be configurable without changing source code. The 
 ```
 res://
     scenes/              # Scene files (.tscn) and scene scripts
-    core/                # Autoload singletons and core utilities (EventBus, JsonLoader, UnitState, SimulationContext)
-    entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent, ProjectileInstance)
+    core/                # Autoload singletons and core utilities (EventBus, JsonLoader, UnitState, SimulationContext, MatchState)
+    entities/            # Game entities (UnitInstance, BattleGroup, UnitVisualComponent, ProjectileInstance, NexusState)
     commands/            # Command framework (GameCommand, PlayCardCommand, AttackCommand, CommandDispatcher)
-    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem, ProjectileSystem, CollisionSystem, AffinityRegistry, AffinityRuleSystem, EffectRegistry, EffectLoader, EffectSystem)
+    systems/             # Game systems (CombatSystem, FormationSystem, SpatialQuerySystem, TargetingSystem, SpawnSystem, DeckSystem, AttackSystem, EconomySystem, ProjectileSystem, CollisionSystem, AffinityRegistry, AffinityRuleSystem, EffectRegistry, EffectLoader, EffectSystem, AbilityRegistry, AbilityLoader, AbilitySystem, MatchFlowSystem, NexusSystem)
     actions/             # Action framework (GameAction, DamageAction)
     resources/           # Resource runtime state (ResourceInstance)
     models/              # Attack models and registry (AttackModel, MeleeAttackModel, RangedAttackModel, AttackModelRegistry, ProjectileDefinitionRegistry, CombatModifier, CombatModifierCollection)
-    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition, AffinityDefinition, EffectDefinition)
+    definitions/         # Data definitions (UnitDefinition, StageDefinition, DeckDefinition, ResourceDefinition, ProjectileDefinition, AffinityDefinition, EffectDefinition, AbilityDefinition, MatchRulesDefinition)
     factories/           # Object factories (UnitFactory, ProjectileFactory)
     effects/             # Effect runtime (EffectInstance, EffectComponent, DurationComponent, CombatModifierComponent)
+    abilities/           # Ability runtime (AbilityInstance, AbilityComponent, ApplyEffectComponent, SpawnProjectileComponent, GenerateCommandComponent)
+    pipelines/           # Ability pipeline (AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor)
+    conditions/          # Match conditions (MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
@@ -37,6 +40,8 @@ res://
         projectiles/     # Projectile definitions (projectiles.json)
         affinities.json  # Affinity definitions
         effects.json     # Effect definitions
+        abilities.json   # Ability definitions
+        match_rules.json # Match rules (victory conditions, countdown, time limit)
     rules/
         affinity_rules.json  # Affinity relationship rules
     assets/
@@ -68,6 +73,7 @@ Autoloaded singletons and infrastructure available globally.
 | `EventBus` | Global signal bus for decoupled communication between systems. Emits resource events. |
 | `UnitState` | Enum and string conversion for unit states. |
 | `SimulationContext` | Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides consistent time source for systems. |
+| `MatchState` | Enum and string conversion for match states (LOADING, INITIALIZING, COUNTDOWN, RUNNING, PAUSED, VICTORY, DEFEAT, DRAW, FINISHED). |
 
 ### Commands
 
@@ -101,6 +107,11 @@ Game logic systems that orchestrate behavior.
 | `EffectRegistry` | RefCounted | Stores and provides lookup for effect definitions. Validates uniqueness and provides query methods. |
 | `EffectLoader` | RefCounted | Static loader that reads effect definitions from JSON and populates the registry. |
 | `EffectSystem` | Node | Manages effect lifecycle: create, destroy, update durations, handle stacking, refresh, emit events, dispatch triggers. Generates CombatModifiers for units. |
+| `AbilityRegistry` | RefCounted | Stores and provides lookup for ability definitions. Validates uniqueness and provides query methods. |
+| `AbilityLoader` | RefCounted | Static loader that reads ability definitions from JSON and populates the registry. |
+| `AbilitySystem` | Node | Manages ability execution, cooldown validation, component evaluation, and command generation. Uses SimulationContext for cooldown timing. Never deals damage directly. |
+| `MatchFlowSystem` | Node | Manages match lifecycle (state transitions, countdown, pause/resume, victory/defeat detection). Evaluates pluggable victory conditions. Never modifies gameplay directly. |
+| `NexusSystem` | RefCounted | Manages base HP for each team. Provides damage API and emits nexus events. |
 
 ### Models
 
@@ -143,6 +154,7 @@ Runtime game objects.
 | `BattleGroup` | RefCounted | Maintains ordered player/enemy formations. Provides frontline lookup. |
 | `UnitVisualComponent` | Node | Handles all visual building and updates (HP bar, labels, target display). |
 | `ProjectileInstance` | Node2D | Represents a projectile in flight. Owns position, direction, speed, owner, target, remaining_distance. Handles movement and collision detection. Supports optional debug rendering. |
+| `NexusState` | RefCounted | Tracks base HP for a team. Provides is_alive(), take_damage(), get_hp_ratio(). |
 
 **UnitInstance State Machine:** Units transition through states: MOVING → BLOCKED → ATTACKING → MOVING. When a target dies and no new target is available, units automatically resume movement via `set_moving()`. When a BattleGroup becomes empty of enemies, surviving units are released via `release_from_battle_group()`, which resets movement flags and allows them to continue toward their original destination.
 
@@ -159,6 +171,8 @@ Pure data containers parsed from JSON.
 | `ProjectileDefinition` | RefCounted | Stores projectile properties (id, display_name, speed, max_range, damage, projectile_type, image). Loaded from projectiles.json. |
 | `AffinityDefinition` | RefCounted | Stores affinity properties (id, display_name, description, primary_color, icon, background). Loaded from affinities.json. |
 | `EffectDefinition` | RefCounted | Stores effect properties (id, display_name, description, icon, stacking_policy, visual_hint, components, metadata). Components define effect behavior through composition. Loaded from effects.json. |
+| `AbilityDefinition` | RefCounted | Stores ability properties (id, display_name, description, icon, cooldown, activation, pipeline, metadata). Pipeline defines ability execution through sequential node composition. Loaded from abilities.json. |
+| `MatchRulesDefinition` | RefCounted | Stores match rules (countdown_duration, time_limit, nexus_hp, victory_conditions). Loaded from match_rules.json. |
 
 ### Factories
 
@@ -179,6 +193,39 @@ Runtime effect state and component-based behavior.
 | `EffectComponent` | RefCounted | Base interface for effect behavior components. Defines update(), get_modifiers(), is_expired() methods. |
 | `DurationComponent` | EffectComponent | Manages effect duration, expiration, and refresh policy. Stores remaining_time in runtime_state. |
 | `CombatModifierComponent` | EffectComponent | Generates CombatModifier objects from configuration. Supports all modifier operations and stack scaling. |
+
+### Abilities
+
+Runtime ability state and component-based behavior.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `AbilityInstance` | RefCounted | Runtime ability activation state: instance_id, definition, owner, runtime_state, executed_components, generated_commands. Records execution details for debug. |
+| `AbilityComponent` | RefCounted | Base interface for ability behavior components. Defines execute() method that returns GameCommand array. |
+| `ApplyEffectComponent` | AbilityComponent | Delegates to EffectSystem.apply_effect(). Reuses existing effect infrastructure. |
+| `SpawnProjectileComponent` | AbilityComponent | Delegates to ProjectileFactory.create_projectile(). Reuses existing projectile infrastructure. |
+| `GenerateCommandComponent` | AbilityComponent | Creates GameCommand objects for CommandDispatcher dispatch. |
+
+### Pipelines
+
+Ability execution pipeline abstraction for sequential and future complex execution flows.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `AbilityPipeline` | RefCounted | Ordered list of AbilityPipelineNode objects. Created from JSON or auto-migrated from component arrays. |
+| `AbilityPipelineNode` | RefCounted | Wraps a component execution or future node type (delay, condition, branch). Data-driven from JSON. |
+| `AbilityPipelineExecutor` | RefCounted | Executes pipeline nodes sequentially. Creates components, collects commands. |
+
+### Conditions
+
+Pluggable match victory/defeat conditions evaluated by MatchFlowSystem.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `MatchCondition` | RefCounted | Base interface for match conditions. Defines check(context) -> bool. |
+| `DestroyEnemyNexusCondition` | MatchCondition | Checks if enemy nexus HP <= 0. |
+| `DestroyPlayerNexusCondition` | MatchCondition | Checks if player nexus HP <= 0. |
+| `TimeLimitCondition` | MatchCondition | Checks if elapsed match time >= configured limit. |
 
 ## EventBus
 
@@ -208,6 +255,21 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 | `effect_expired(effect)` | EffectSystem | UnitVisualComponent, Debug UI |
 | `effect_refreshed(effect)` | EffectSystem | UnitVisualComponent, Debug UI |
 | `effect_stack_changed(effect)` | EffectSystem | UnitVisualComponent, Debug UI |
+| `ability_started(ability)` | AbilitySystem | Debug UI |
+| `ability_finished(ability)` | AbilitySystem | Debug UI |
+| `ability_cancelled(ability_id, owner)` | AbilitySystem | (future) |
+| `ability_cooldown_started(ability_id, owner, duration)` | AbilitySystem | Ability UI |
+| `ability_ready(ability_id, owner)` | AbilitySystem | Ability UI |
+| `match_started` | MatchFlowSystem | BattleScene |
+| `match_paused` | MatchFlowSystem | BattleScene |
+| `match_resumed` | MatchFlowSystem | BattleScene |
+| `match_finished(winner, loser, elapsed_time)` | MatchFlowSystem | BattleScene |
+| `victory(winner, condition)` | MatchFlowSystem | BattleScene |
+| `defeat(loser, condition)` | MatchFlowSystem | BattleScene |
+| `draw(condition)` | MatchFlowSystem | BattleScene |
+| `countdown_started(duration)` | MatchFlowSystem | BattleScene |
+| `nexus_damaged(team, current_hp, max_hp)` | NexusSystem | BattleScene |
+| `nexus_destroyed(team)` | NexusSystem | MatchFlowSystem |
 
 ## Gameplay Flow
 
@@ -310,16 +372,17 @@ Unit dies
 - [x] **Milestone 10** - Projectile Layer: ProjectileDefinition, ProjectileInstance, ProjectileFactory, ProjectileSystem, CollisionSystem, RangedAttackModel, projectile collision detection
 - [x] **Milestone 11** - Affinity Rule Engine: AffinityDefinition, AffinityRegistry, AffinityRuleSystem, CombatModifier, CombatModifierCollection, affinity-based damage modifiers, UI affinity display
 - [x] **Milestone 12** - Effect Engine: EffectDefinition, EffectRegistry, EffectLoader, EffectInstance, EffectSystem, effect lifecycle, stacking policies, trigger infrastructure, CombatModifier generation, effect icon UI, debug panel
+- [x] **Milestone 13** - Ability Composition Engine: AbilityDefinition, AbilityRegistry, AbilityLoader, AbilityInstance, AbilityComponent, ApplyEffectComponent, SpawnProjectileComponent, GenerateCommandComponent, AbilitySystem, cooldown management, ability UI, debug panel
+- [x] **Milestone 14** - Match Flow Engine: MatchState, MatchFlowSystem, MatchRulesDefinition, NexusState, NexusSystem, MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition, AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor, match UI, countdown, victory/defeat display
 
 ### Planned
 
-- [ ] **Milestone 13** - Ability Layer: ability system, trigger conditions, ability effects
-- [ ] **Milestone 14** - AI Layer: AI decision making, strategy, deck building
-- [ ] **Milestone 15** - Match Flow: victory conditions, base destruction, win/lose detection
+- [ ] **Milestone 15** - AI Layer: AI decision making, strategy, deck building
 - [ ] **Milestone 16** - Content Pipeline: tools, editors, content creation workflow
-- [ ] **Milestone 17** - Animations and visual effects
-- [ ] **Milestone 18** - Audio: sound effects, music
-- [ ] **Milestone 19** - Menus, settings, save system
+- [ ] **Milestone 17** - Replay & Deterministic Simulation
+- [ ] **Milestone 18** - Animations and visual effects
+- [ ] **Milestone 19** - Audio: sound effects, music
+- [ ] **Milestone 20** - Menus, settings, save system
 
 ## Architecture Rules
 

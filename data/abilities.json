@@ -1,0 +1,39 @@
+{
+  "abilities": [
+    {
+      "id": "battle_cry",
+      "display_name": "Battle Cry",
+      "description": "Applies Strength effect to the caster, increasing attack damage by 10%",
+      "icon": "",
+      "cooldown": 15.0,
+      "activation": "instant",
+      "components": [
+        {
+          "type": "ApplyEffectComponent",
+          "effect_id": "strength",
+          "target": "self"
+        }
+      ],
+      "metadata": {
+        "category": "buff"
+      }
+    },
+    {
+      "id": "arrow_volley",
+      "display_name": "Arrow Volley",
+      "description": "Launches an arrow projectile at the current target",
+      "icon": "",
+      "cooldown": 8.0,
+      "activation": "instant",
+      "components": [
+        {
+          "type": "SpawnProjectileComponent",
+          "projectile_id": "arrow_basic"
+        }
+      ],
+      "metadata": {
+        "category": "attack"
+      }
+    }
+  ]
+}
