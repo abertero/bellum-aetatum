@@ -1,0 +1,109 @@
+{
+  "personalities": [
+    {
+      "id": "balanced",
+      "display_name": "Balanced",
+      "description": "Adapts to the situation with a balanced approach between offense and defense.",
+      "evaluation_weights": {
+        "spawn_unit": 0.5,
+        "use_ability": 0.3,
+        "save_resources": 0.2
+      },
+      "resource_strategy": "balanced",
+      "spawn_preferences": ["melee", "ranged"],
+      "preferred_affinities": [],
+      "risk_tolerance": 0.5,
+      "metadata": {}
+    },
+    {
+      "id": "aggressive",
+      "display_name": "Aggressive",
+      "description": "Prioritizes offense and constant unit spawning to overwhelm the enemy.",
+      "evaluation_weights": {
+        "spawn_unit": 0.8,
+        "use_ability": 0.4,
+        "save_resources": 0.1
+      },
+      "resource_strategy": "spend",
+      "spawn_preferences": ["melee"],
+      "preferred_affinities": ["ignis"],
+      "risk_tolerance": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "defensive",
+      "display_name": "Defensive",
+      "description": "Focuses on resource management and strong defensive units.",
+      "evaluation_weights": {
+        "spawn_unit": 0.3,
+        "use_ability": 0.2,
+        "save_resources": 0.5
+      },
+      "resource_strategy": "save",
+      "spawn_preferences": ["melee"],
+      "preferred_affinities": ["terra"],
+      "risk_tolerance": 0.2,
+      "metadata": {}
+    },
+    {
+      "id": "economic",
+      "display_name": "Economic",
+      "description": "Maximizes resource efficiency and waits for optimal moments to strike.",
+      "evaluation_weights": {
+        "spawn_unit": 0.4,
+        "use_ability": 0.2,
+        "save_resources": 0.6
+      },
+      "resource_strategy": "save",
+      "spawn_preferences": ["ranged", "melee"],
+      "preferred_affinities": ["lux"],
+      "risk_tolerance": 0.3,
+      "metadata": {}
+    },
+    {
+      "id": "rush",
+      "display_name": "Rush",
+      "description": "Spends all resources immediately on cheap fast units for an early push.",
+      "evaluation_weights": {
+        "spawn_unit": 0.9,
+        "use_ability": 0.1,
+        "save_resources": 0.0
+      },
+      "resource_strategy": "spend",
+      "spawn_preferences": ["melee"],
+      "preferred_affinities": [],
+      "risk_tolerance": 1.0,
+      "metadata": {}
+    },
+    {
+      "id": "swarm",
+      "display_name": "Swarm",
+      "description": "Overwhelms the enemy with many low-cost units.",
+      "evaluation_weights": {
+        "spawn_unit": 0.7,
+        "use_ability": 0.2,
+        "save_resources": 0.1
+      },
+      "resource_strategy": "spend",
+      "spawn_preferences": ["melee", "ranged"],
+      "preferred_affinities": ["umbra"],
+      "risk_tolerance": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "legend_hunter",
+      "display_name": "Legend Hunter",
+      "description": "Focuses on high-value units and abilities, targeting key enemy threats.",
+      "evaluation_weights": {
+        "spawn_unit": 0.4,
+        "use_ability": 0.6,
+        "save_resources": 0.3
+      },
+      "resource_strategy": "balanced",
+      "spawn_preferences": ["ranged"],
+      "preferred_affinities": ["aqua", "lux"],
+      "risk_tolerance": 0.6,
+      "metadata": {}
+    }
+  ]
+}

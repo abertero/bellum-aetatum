@@ -2844,4 +2844,119 @@ Introduce the Match Flow Engine with explicit match lifecycle management, plugga
 | `docs/Architecture.md` | Updated | New layers and signals |
 | `MILESTONES.md` | Updated | Milestone 14, roadmap |
 
+---
+
+## Milestone 15 - AI Decision Engine
+
+### Objective
+
+Introduce the AI Decision Engine. The AI plays the game using exactly the same gameplay pipeline as the player. No gameplay system knows whether a Command originated from a player or from AI.
+
+### What Was Implemented
+
+#### 1. AI Architecture Layers
+
+Four-layer AI architecture:
+- **Perception**: PerceptionSystem reads WorldState from game systems
+- **Evaluation**: EvaluationSystem calculates weighted scores using personality data
+- **Decision**: DecisionSystem selects highest-scoring action
+- **Command Generation**: AICommandGenerator creates PlayCardCommand or AbilityCommand
+
+#### 2. WorldState
+
+Read-only data snapshot containing:
+- Friendly and enemy unit lists
+- Resource state (current, maximum, regen rate)
+- Available and affordable cards
+- Ability cooldowns
+- Nexus HP ratios
+- Match state and elapsed time
+- Battlefield dimensions and spawn positions
+- Affinity distribution
+
+#### 3. AbilityCommand
+
+New command type for ability usage. Carries ability_id, caster, and optional target. Routed by CommandDispatcher to AbilitySystem. AI uses abilities through the same pipeline as the player.
+
+#### 4. AI Personalities
+
+Seven data-driven personalities loaded from JSON:
+- **Balanced**: Equal weights, moderate risk
+- **Aggressive**: High spawn weight, spend strategy, fire affinity
+- **Defensive**: High save weight, save strategy, earth affinity
+- **Economic**: Maximum save weight, save strategy, light affinity
+- **Rush**: Maximum spawn weight, spend everything
+- **Swarm**: High spawn weight, many cheap units, dark affinity
+- **Legend Hunter**: High ability weight, balanced resources
+
+Each personality defines: evaluation_weights, resource_strategy, spawn_preferences, preferred_affinities, risk_tolerance.
+
+#### 5. GameModeDefinition
+
+Data container referencing a default AI personality by ID. Different game modes can use different personalities.
+
+#### 6. AI Debug Panel
+
+Displays: current AI personality, evaluation scores, chosen action, generated command, resource reserve.
+
+#### 7. AI Events
+
+Three new EventBus signals:
+- `ai_decision_started(personality_id)`
+- `ai_decision_finished(personality_id, action_type)`
+- `ai_command_generated(command, personality_id)`
+
+#### 8. Replaced Hardcoded Enemy Spawning
+
+The timer-based sequential enemy spawn in BattleScene was replaced by the AI decision engine. The AI generates PlayCardCommand through CommandDispatcher, exactly like the player.
+
+### Architecture Improvements
+
+1. **AI reuses existing Commands**: PlayCardCommand, AbilityCommand flow through CommandDispatcher
+2. **AI never modifies WorldState directly**: Only reads through PerceptionSystem
+3. **AI personalities are pure data**: New personalities need zero code changes
+4. **Open/Closed Principle**: New action types extend EvaluationSystem; new decision algorithms replace DecisionSystem
+5. **Separation of concerns**: Perception, Evaluation, Decision, and Generation are independent layers
+
+### Files Created
+
+| File | Lines | Purpose |
+|---|---|---|
+| `ai/WorldState.gd` | 55 | Read-only world snapshot |
+| `ai/PerceptionSystem.gd` | 105 | Populates WorldState from systems |
+| `ai/EvaluationSystem.gd` | 115 | Weighted score calculation |
+| `ai/DecisionSystem.gd` | 15 | Highest-score selection |
+| `ai/AICommandGenerator.gd` | 50 | Decision to Command conversion |
+| `ai/AIDecisionEngine.gd` | 65 | AI orchestrator |
+| `ai/AIRegistry.gd` | 35 | Personality storage |
+| `ai/AILoader.gd` | 30 | JSON personality loader |
+| `ai/AIEvaluationResult.gd` | 30 | Evaluation result data |
+| `ai/AIDebugData.gd` | 45 | Debug data for UI |
+| `definitions/AIPersonalityDefinition.gd` | 45 | Personality data container |
+| `definitions/GameModeDefinition.gd` | 25 | Game mode data container |
+| `commands/AbilityCommand.gd` | 22 | Ability use command |
+| `data/ai_personalities.json` | 90 | 7 AI personalities |
+| `data/game_modes.json` | 30 | 3 game modes |
+| `docs/adr/ADR-015-AI-Decision-Engine.md` | 170 | ADR |
+| `docs/Gameplay.md` | 90 | Gameplay documentation |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/EventBus.gd` | +3 signals | AI events |
+| `commands/CommandDispatcher.gd` | +AbilityCommand routing | AI ability usage |
+| `scenes/battle_scene.gd` | Replaced enemy spawn with AI | AI integration |
+| `README.md` | Updated | AI layer docs |
+| `docs/Architecture.md` | Updated | AI layer and signals |
+| `MILESTONES.md` | Updated | Milestone 15, roadmap |
+
+### Verification
+
+- AI uses the same Commands as the player (PlayCardCommand, AbilityCommand)
+- AI never modifies WorldState directly (PerceptionSystem is read-only)
+- AI personalities load from JSON (data/ai_personalities.json)
+- New personalities can be added without writing code (pure data)
+- CommandDispatcher routes AI commands identically to player commands
+- No gameplay system knows whether a command came from player or AI
 

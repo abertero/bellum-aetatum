@@ -30,6 +30,14 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          |              |              |
          v              v              v
 +------------------------------------------------------------------+
+|                      AI Decision Engine                           |
+|  WorldState | PerceptionSystem | EvaluationSystem                |
+|  DecisionSystem | AICommandGenerator | AIDecisionEngine          |
+|  AIRegistry | AILoader | AIEvaluationResult | AIDebugData        |
++------------------------------------------------------------------+
+         |              |              |
+         v              v              v
++------------------------------------------------------------------+
 |                        Actions Layer                              |
 |  GameAction | DamageAction                                       |
 +------------------------------------------------------------------+
@@ -89,6 +97,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  ResourceDefinition | ProjectileDefinition | AffinityDefinition  |
 |  EffectDefinition                                       |
 |  AbilityDefinition | MatchRulesDefinition               |
+|  AIPersonalityDefinition | GameModeDefinition           |
 +------------------------------------------------------------------+
          |
          v
@@ -112,6 +121,7 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
 |  effects.json                                                  |
 |  abilities.json                                                |
 |  match_rules.json                                              |
+|  ai_personalities.json | game_modes.json                        |
 |  rules/affinity_rules.json                                       |
 +------------------------------------------------------------------+
 ```
@@ -273,6 +283,21 @@ Pluggable match victory/defeat conditions.
 - **DestroyPlayerNexusCondition**: Checks if player nexus HP <= 0.
 - **TimeLimitCondition**: Checks if elapsed match time >= configured limit.
 
+### AI Decision Engine
+
+AI layers for perception, evaluation, decision-making, and command generation. AI uses the same Commands as the player.
+
+- **WorldState**: Read-only data snapshot that the AI uses to perceive the world. Contains friendly/enemy units, resources, available cards, ability cooldowns, nexus HP ratios, match state, battlefield dimensions, affinity distribution. Populated by PerceptionSystem.
+- **PerceptionSystem**: Reads from existing game systems (SpatialQuerySystem, EconomySystem, NexusSystem, AbilitySystem) and produces a WorldState snapshot. Never inspects UI. Never modifies game state.
+- **EvaluationSystem**: Calculates weighted scores for possible actions using personality evaluation_weights. Evaluates: Spawn Unit (card stats, strategic need, affinity preference), Use Ability (strategic need), Save Resources (resource ratio, strategy).
+- **DecisionSystem**: Selects the highest-scoring evaluation result. Returns null if all scores are zero or negative.
+- **AICommandGenerator**: Converts a decision into a gameplay Command (PlayCardCommand or AbilityCommand). Calculates spawn/target positions. Uses same command creation as the player.
+- **AIDecisionEngine**: Orchestrates the decision cycle (Perception -> Evaluation -> Decision -> Command Generation) on a 1.5s interval. Emits ai_decision_started, ai_decision_finished, ai_command_generated events.
+- **AIRegistry**: Stores AI personalities by ID. Validates uniqueness.
+- **AILoader**: Static loader that reads AI personalities from JSON and populates the registry.
+- **AIEvaluationResult**: Data container for evaluation results: action_type (spawn_unit, use_ability, save_resources), score, data dictionary.
+- **AIDebugData**: Debug data for AI UI: personality info, evaluation scores, chosen action, generated command, resource reserve.
+
 ### Factories Layer
 
 Object creation logic.
@@ -376,6 +401,9 @@ MatchFlowSystem      --[draw]------------------> BattleScene
 MatchFlowSystem      --[countdown_started]-----> BattleScene
 NexusSystem          --[nexus_damaged]---------> BattleScene
 NexusSystem          --[nexus_destroyed]-------> MatchFlowSystem
+AIDecisionEngine     --[ai_decision_started]----> Debug UI
+AIDecisionEngine     --[ai_decision_finished]---> Debug UI
+AIDecisionEngine     --[ai_command_generated]---> Debug UI
 ```
 
 ### Rules
@@ -438,7 +466,7 @@ NexusSystem          --[nexus_destroyed]-------> MatchFlowSystem
 ### Command Execution Flow
 
 ```
-Player Input / AI / Replay
+Player Input / AI Decision Engine
   -> Create GameCommand (immutable request)
   -> CommandDispatcher.dispatch(command)
      -> Route to appropriate system
@@ -446,6 +474,36 @@ Player Input / AI / Replay
      -> System produces GameAction (if applicable)
   -> EventBus broadcasts GameAction
   -> Listeners react to GameAction
+```
+
+### AI Decision Flow
+
+```
+AIDecisionEngine.update(delta)
+  -> Timer reaches DECISION_INTERVAL (1.5s)
+  -> EventBus.ai_decision_started.emit(personality_id)
+  -> PerceptionSystem.perceive(team)
+     -> Read SpatialQuerySystem (units, formations)
+     -> Read EconomySystem (resources)
+     -> Read NexusSystem (nexus HP)
+     -> Read AbilitySystem (cooldowns)
+     -> Read StageDefinition (battlefield)
+     -> Produce WorldState
+  -> EvaluationSystem.evaluate(world_state)
+     -> Score spawn options (card stats + strategic need + personality weights)
+     -> Score ability options (strategic need + personality weights)
+     -> Score save resources (resource ratio + personality strategy)
+     -> Return Array[AIEvaluationResult]
+  -> DecisionSystem.decide(evaluations)
+     -> Select highest score
+     -> Return AIEvaluationResult or null
+  -> AICommandGenerator.generate(decision, team)
+     -> For spawn_unit: Create PlayCardCommand
+     -> For use_ability: Create AbilityCommand
+  -> CommandDispatcher.dispatch(command)
+     -> Same pipeline as player
+  -> EventBus.ai_command_generated.emit(command, personality_id)
+  -> EventBus.ai_decision_finished.emit(personality_id, action_type)
 ```
 
 ### Attack Execution Flow
@@ -511,11 +569,14 @@ CombatSystem._update_attack_timer()
 _physics_process(delta):
   1. BattleScene._physics_process()
      -> SimulationContext.update(delta)
-     -> _update_enemy_spawn_timer()
-        -> PlayCardCommand -> CommandDispatcher -> SpawnSystem
+     -> _update_ai(delta)
+        -> AIDecisionEngine.update(delta)
+           -> PerceptionSystem -> EvaluationSystem -> DecisionSystem -> AICommandGenerator
+           -> PlayCardCommand / AbilityCommand -> CommandDispatcher
      -> _update_debug_panel()
      -> _update_resource_panel()
      -> _update_card_affordability()
+     -> _update_ai_debug_panel()
 
   2. FormationSystem._physics_process()
      -> _cleanup_invalid_units()

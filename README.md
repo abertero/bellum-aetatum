@@ -32,6 +32,7 @@ res://
     abilities/           # Ability runtime (AbilityInstance, AbilityComponent, ApplyEffectComponent, SpawnProjectileComponent, GenerateCommandComponent)
     pipelines/           # Ability pipeline (AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor)
     conditions/          # Match conditions (MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition)
+    ai/                  # AI Decision Engine (PerceptionSystem, EvaluationSystem, DecisionSystem, AICommandGenerator, AIDecisionEngine, AIRegistry, AILoader, WorldState, AIEvaluationResult, AIDebugData)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
@@ -42,6 +43,8 @@ res://
         effects.json     # Effect definitions
         abilities.json   # Ability definitions
         match_rules.json # Match rules (victory conditions, countdown, time limit)
+        ai_personalities.json  # AI personality configurations
+        game_modes.json        # Game mode configurations
     rules/
         affinity_rules.json  # Affinity relationship rules
     assets/
@@ -85,6 +88,7 @@ Command framework separating player intent from gameplay execution. Commands are
 | `PlayCardCommand` | RefCounted | Extends GameCommand. Represents player intent to spawn a unit. Carries card definition, positions, and team. |
 | `AttackCommand` | RefCounted | Extends GameCommand. Represents intent to attack. Carries attacker and target references. |
 | `CommandDispatcher` | RefCounted | Routes commands to responsible systems. Validates commands against EconomySystem before dispatching. Never implements gameplay logic. |
+| `AbilityCommand` | RefCounted | Extends GameCommand. Represents intent to use an ability. Carries ability_id, caster, and target. |
 
 ### Systems
 
@@ -173,6 +177,8 @@ Pure data containers parsed from JSON.
 | `EffectDefinition` | RefCounted | Stores effect properties (id, display_name, description, icon, stacking_policy, visual_hint, components, metadata). Components define effect behavior through composition. Loaded from effects.json. |
 | `AbilityDefinition` | RefCounted | Stores ability properties (id, display_name, description, icon, cooldown, activation, pipeline, metadata). Pipeline defines ability execution through sequential node composition. Loaded from abilities.json. |
 | `MatchRulesDefinition` | RefCounted | Stores match rules (countdown_duration, time_limit, nexus_hp, victory_conditions). Loaded from match_rules.json. |
+| `AIPersonalityDefinition` | RefCounted | Stores AI personality data (evaluation_weights, resource_strategy, spawn_preferences, preferred_affinities, risk_tolerance). Loaded from ai_personalities.json. |
+| `GameModeDefinition` | RefCounted | Stores game mode data (id, display_name, default_ai_personality_id, match_rules_path, stage_path). Loaded from game_modes.json. |
 
 ### Factories
 
@@ -227,6 +233,23 @@ Pluggable match victory/defeat conditions evaluated by MatchFlowSystem.
 | `DestroyPlayerNexusCondition` | MatchCondition | Checks if player nexus HP <= 0. |
 | `TimeLimitCondition` | MatchCondition | Checks if elapsed match time >= configured limit. |
 
+### AI Decision Engine
+
+AI layers for perception, evaluation, decision-making, and command generation. AI uses the same Commands as the player.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `WorldState` | RefCounted | Read-only snapshot of the game world for AI perception. Contains units, resources, cards, cooldowns, nexus HP, match state. |
+| `PerceptionSystem` | RefCounted | Reads game systems and populates WorldState. Never inspects UI. |
+| `EvaluationSystem` | RefCounted | Calculates weighted scores for possible actions using personality weights. |
+| `DecisionSystem` | RefCounted | Selects the highest-scoring action from evaluations. |
+| `AICommandGenerator` | RefCounted | Converts decisions into PlayCardCommand or AbilityCommand. |
+| `AIDecisionEngine` | RefCounted | Orchestrates the AI decision cycle on a timer. Emits AI events. |
+| `AIRegistry` | RefCounted | Stores AI personalities by ID. |
+| `AILoader` | RefCounted | Loads AI personalities from JSON. |
+| `AIEvaluationResult` | RefCounted | Evaluation result data: action type, score, action data. |
+| `AIDebugData` | RefCounted | Debug data for AI UI: personality, scores, chosen action, command. |
+
 ## EventBus
 
 All systems communicate through `EventBus` signals, avoiding direct coupling.
@@ -270,6 +293,9 @@ All systems communicate through `EventBus` signals, avoiding direct coupling.
 | `countdown_started(duration)` | MatchFlowSystem | BattleScene |
 | `nexus_damaged(team, current_hp, max_hp)` | NexusSystem | BattleScene |
 | `nexus_destroyed(team)` | NexusSystem | MatchFlowSystem |
+| `ai_decision_started(personality_id)` | AIDecisionEngine | Debug UI |
+| `ai_decision_finished(personality_id, action_type)` | AIDecisionEngine | Debug UI |
+| `ai_command_generated(command, personality_id)` | AIDecisionEngine | Debug UI |
 
 ## Gameplay Flow
 
@@ -374,10 +400,10 @@ Unit dies
 - [x] **Milestone 12** - Effect Engine: EffectDefinition, EffectRegistry, EffectLoader, EffectInstance, EffectSystem, effect lifecycle, stacking policies, trigger infrastructure, CombatModifier generation, effect icon UI, debug panel
 - [x] **Milestone 13** - Ability Composition Engine: AbilityDefinition, AbilityRegistry, AbilityLoader, AbilityInstance, AbilityComponent, ApplyEffectComponent, SpawnProjectileComponent, GenerateCommandComponent, AbilitySystem, cooldown management, ability UI, debug panel
 - [x] **Milestone 14** - Match Flow Engine: MatchState, MatchFlowSystem, MatchRulesDefinition, NexusState, NexusSystem, MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition, AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor, match UI, countdown, victory/defeat display
+- [x] **Milestone 15** - AI Decision Engine: WorldState, PerceptionSystem, EvaluationSystem, DecisionSystem, AICommandGenerator, AIDecisionEngine, AIRegistry, AILoader, AIPersonalityDefinition, GameModeDefinition, AbilityCommand, AI personalities (Balanced, Aggressive, Defensive, Economic, Rush, Swarm, Legend Hunter), AI debug panel
 
 ### Planned
 
-- [ ] **Milestone 15** - AI Layer: AI decision making, strategy, deck building
 - [ ] **Milestone 16** - Content Pipeline: tools, editors, content creation workflow
 - [ ] **Milestone 17** - Replay & Deterministic Simulation
 - [ ] **Milestone 18** - Animations and visual effects

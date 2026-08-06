@@ -5,7 +5,6 @@ const BASE_HEIGHT: float = 120.0
 const CARD_BUTTON_WIDTH: float = 90.0
 const CARD_BUTTON_HEIGHT: float = 130.0
 const VIEWPORT_HEIGHT: float = 648.0
-const ENEMY_SPAWN_INTERVAL: float = 3.0
 
 var _stage_definition: StageDefinition
 var _simulation_context: SimulationContext
@@ -25,8 +24,6 @@ var _affinity_rule_system: AffinityRuleSystem
 var _effect_registry: EffectRegistry
 var _effect_system: EffectSystem
 var _unit_container: Node2D
-var _enemy_spawn_timer: float = 0.0
-var _enemy_deck_index: int = 0
 var _debug_panel: PanelContainer = null
 var _resource_panel: PanelContainer = null
 var _resource_label: Label = null
@@ -48,6 +45,10 @@ var _countdown_label: Label = null
 var _result_label: Label = null
 var _match_debug_label: Label = null
 var _nexus_hp_labels: Dictionary = {}
+var _ai_registry: AIRegistry = null
+var _ai_engine: AIDecisionEngine = null
+var _ai_debug_panel: PanelContainer = null
+var _ai_debug_label: Label = null
 
 
 func _ready() -> void:
@@ -74,6 +75,7 @@ func _ready() -> void:
 	_setup_ability_system()
 	_setup_combat_system()
 	_setup_match_flow_system()
+	_setup_ai_systems()
 	_load_decks()
 	_create_card_buttons()
 	_setup_debug_panel()
@@ -84,6 +86,7 @@ func _ready() -> void:
 	_setup_ability_debug_panel()
 	_setup_match_ui()
 	_setup_match_debug_panel()
+	_setup_ai_debug_panel()
 	_connect_signals()
 	_match_flow_system.start_match()
 
@@ -91,7 +94,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_simulation_context.update(delta)
 	if _is_match_running():
-		_update_enemy_spawn_timer(delta)
+		_update_ai(delta)
 	_update_debug_panel()
 	_update_resource_panel()
 	_update_card_affordability()
@@ -101,6 +104,7 @@ func _physics_process(delta: float) -> void:
 	_update_match_ui()
 	_update_match_debug_panel()
 	_update_nexus_display()
+	_update_ai_debug_panel()
 
 
 func _is_match_running() -> bool:
@@ -109,11 +113,10 @@ func _is_match_running() -> bool:
 	return _match_flow_system.get_current_state() == MatchState.State.RUNNING
 
 
-func _update_enemy_spawn_timer(delta: float) -> void:
-	_enemy_spawn_timer += delta
-	if _enemy_spawn_timer >= ENEMY_SPAWN_INTERVAL:
-		_enemy_spawn_timer = 0.0
-		_spawn_enemy_unit()
+func _update_ai(delta: float) -> void:
+	if _ai_engine == null:
+		return
+	_ai_engine.update(delta)
 
 
 func _load_stage() -> void:
@@ -345,29 +348,32 @@ func _on_card_pressed(card_def: UnitDefinition) -> void:
 		print("BattleScene: spawned %s" % card_def.name)
 
 
-func _spawn_enemy_unit() -> void:
-	var enemy_deck: Array[UnitDefinition] = DeckSystem.get_enemy_deck()
-	if enemy_deck.is_empty():
+func _setup_ai_systems() -> void:
+	_ai_registry = AIRegistry.new()
+	AILoader.load_personalities(_ai_registry, "res://data/ai_personalities.json")
+
+	var personality: AIPersonalityDefinition = _ai_registry.get_personality("balanced")
+	if personality == null:
+		push_error("BattleScene: failed to load AI personality")
 		return
 
-	var card_def: UnitDefinition = enemy_deck[_enemy_deck_index % enemy_deck.size()]
-	
-	if not _economy_system.can_afford("enemy", "imperium", card_def.cost):
-		return
-	
-	_enemy_deck_index += 1
+	var perception := PerceptionSystem.new()
+	perception.initialize(_spatial_query, _economy_system, _nexus_system, _ability_system, _stage_definition)
+	perception.set_ability_registry(_ability_registry)
 
-	var spawn_pos: Vector2 = _stage_definition.enemy_spawn_position
-	var position := Vector2(spawn_pos.x, spawn_pos.y)
-	position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
+	var evaluation := EvaluationSystem.new()
 
-	var target_pos: Vector2 = _stage_definition.player_spawn_position
-	var target_position := Vector2(target_pos.x, target_pos.y)
+	var decision_sys := DecisionSystem.new()
 
-	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "enemy")
-	var result: Variant = _command_dispatcher.dispatch(command)
-	if result != null:
-		print("BattleScene: spawned enemy %s" % card_def.name)
+	var command_gen := AICommandGenerator.new()
+	command_gen.initialize(_stage_definition, _unit_container)
+
+	_ai_engine = AIDecisionEngine.new()
+	_ai_engine.initialize(perception, evaluation, decision_sys, command_gen, _command_dispatcher, personality)
+	_ai_engine.set_ability_registry(_ability_registry)
+	_ai_engine.set_team("enemy")
+
+	_command_dispatcher.set_ability_system(_ability_system)
 
 
 func _create_placeholder(size: Vector2, color: Color) -> ImageTexture:
@@ -829,3 +835,24 @@ func _update_match_debug_panel() -> void:
 
 func _update_nexus_display() -> void:
 	pass
+
+
+func _setup_ai_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node("DebugLayer")
+	_ai_debug_panel = PanelContainer.new()
+	_ai_debug_panel.name = "AIDebugPanel"
+	_ai_debug_panel.position = Vector2(800.0, 140.0)
+	_ai_debug_panel.custom_minimum_size = Vector2(250.0, 200.0)
+	canvas_layer.add_child(_ai_debug_panel)
+	_ai_debug_label = Label.new()
+	_ai_debug_label.name = "AIDebugLabel"
+	_ai_debug_label.add_theme_font_size_override("font_size", 10)
+	_ai_debug_panel.add_child(_ai_debug_label)
+	_ai_debug_label.text = "AI: Waiting..."
+
+
+func _update_ai_debug_panel() -> void:
+	if _ai_debug_label == null or _ai_engine == null:
+		return
+	var debug_data: AIDebugData = _ai_engine.get_debug_data()
+	_ai_debug_label.text = debug_data.get_summary()

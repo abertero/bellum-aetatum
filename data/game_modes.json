@@ -1,0 +1,34 @@
+{
+  "game_modes": [
+    {
+      "id": "standard_battle",
+      "display_name": "Standard Battle",
+      "default_ai_personality_id": "balanced",
+      "match_rules_path": "res://data/match_rules.json",
+      "stage_path": "res://data/stages/stage_001.json",
+      "metadata": {
+        "description": "A standard battle against a balanced AI opponent."
+      }
+    },
+    {
+      "id": "aggressive_assault",
+      "display_name": "Aggressive Assault",
+      "default_ai_personality_id": "aggressive",
+      "match_rules_path": "res://data/match_rules.json",
+      "stage_path": "res://data/stages/stage_001.json",
+      "metadata": {
+        "description": "Face an aggressive AI that constantly pushes forward."
+      }
+    },
+    {
+      "id": "defensive_stand",
+      "display_name": "Defensive Stand",
+      "default_ai_personality_id": "defensive",
+      "match_rules_path": "res://data/match_rules.json",
+      "stage_path": "res://data/stages/stage_001.json",
+      "metadata": {
+        "description": "Break through a defensive AI that conserves resources."
+      }
+    }
+  ]
+}
