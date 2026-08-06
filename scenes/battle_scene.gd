@@ -49,9 +49,18 @@ var _ai_registry: AIRegistry = null
 var _ai_engine: AIDecisionEngine = null
 var _ai_debug_panel: PanelContainer = null
 var _ai_debug_label: Label = null
+var _content_pipeline: ContentPipeline = null
+var _content_report: ContentReport = null
+var _content_indexes: ContentIndexes = null
+var _decision_context: DecisionContext = null
+var _game_mode_definition: GameModeDefinition = null
 
 
 func _ready() -> void:
+	_run_content_pipeline()
+	if _content_report != null and not _content_report.is_valid():
+		_show_validation_screen()
+		return
 	_load_stage()
 	_setup_simulation_context()
 	_setup_match_rules()
@@ -76,6 +85,7 @@ func _ready() -> void:
 	_setup_combat_system()
 	_setup_match_flow_system()
 	_setup_ai_systems()
+	_setup_decision_context()
 	_load_decks()
 	_create_card_buttons()
 	_setup_debug_panel()
@@ -352,7 +362,15 @@ func _setup_ai_systems() -> void:
 	_ai_registry = AIRegistry.new()
 	AILoader.load_personalities(_ai_registry, "res://data/ai_personalities.json")
 
+	_game_mode_definition = _load_default_game_mode()
+
 	var personality: AIPersonalityDefinition = _ai_registry.get_personality("balanced")
+	if _game_mode_definition != null and _game_mode_definition.default_ai_personality_id != "":
+		var mode_personality: AIPersonalityDefinition = _ai_registry.get_personality(
+			_game_mode_definition.default_ai_personality_id
+		)
+		if mode_personality != null:
+			personality = mode_personality
 	if personality == null:
 		push_error("BattleScene: failed to load AI personality")
 		return
@@ -856,3 +874,70 @@ func _update_ai_debug_panel() -> void:
 		return
 	var debug_data: AIDebugData = _ai_engine.get_debug_data()
 	_ai_debug_label.text = debug_data.get_summary()
+
+
+func _run_content_pipeline() -> void:
+	_content_pipeline = ContentPipeline.new()
+	_content_pipeline.initialize()
+	_content_pipeline.set_cards(CardLoader.load_cards("res://data/cards/cards.json"))
+	_content_pipeline.set_affinities(_load_all_affinities())
+	_content_pipeline.set_abilities(_load_all_abilities())
+	_content_pipeline.set_effects(_load_all_effects())
+	_content_pipeline.set_projectiles(ProjectileLoader.load_projectiles("res://data/projectiles/projectiles.json"))
+	_content_pipeline.set_game_modes(GameModeLoader.load_game_modes("res://data/game_modes.json"))
+	_content_pipeline.set_personalities(_load_all_personalities())
+	_content_report = _content_pipeline.run()
+	_content_indexes = _content_pipeline.get_indexes()
+	print(_content_report.get_summary())
+
+
+func _load_all_affinities() -> Array[AffinityDefinition]:
+	var registry := AffinityRegistry.new()
+	AffinityLoader.load_affinities(registry, "res://data/affinities.json")
+	return registry.get_all_affinities()
+
+
+func _load_all_abilities() -> Array[AbilityDefinition]:
+	var registry := AbilityRegistry.new()
+	AbilityLoader.load_abilities(registry, "res://data/abilities.json")
+	return registry.get_all_abilities()
+
+
+func _load_all_effects() -> Array[EffectDefinition]:
+	var registry := EffectRegistry.new()
+	EffectLoader.load_effects(registry, "res://data/effects.json")
+	return registry.get_all_effects()
+
+
+func _load_all_personalities() -> Array[AIPersonalityDefinition]:
+	var registry := AIRegistry.new()
+	AILoader.load_personalities(registry, "res://data/ai_personalities.json")
+	return registry.get_all_personalities()
+
+
+func _show_validation_screen() -> void:
+	var screen := load("res://scenes/validation_screen.tscn")
+	if screen != null:
+		var instance: Control = screen.instantiate()
+		add_child(instance)
+		instance.display_report(_content_report)
+	else:
+		push_error("BattleScene: content validation failed")
+		push_error(_content_report.get_error_summary())
+
+
+func _setup_decision_context() -> void:
+	if _ai_engine == null:
+		return
+	var personality: AIPersonalityDefinition = _ai_engine.get_personality()
+	var world_state := WorldState.new()
+	_decision_context = DecisionContext.create(
+		_simulation_context, world_state, _game_mode_definition, personality
+	)
+
+
+func _load_default_game_mode() -> GameModeDefinition:
+	var modes: Array[GameModeDefinition] = GameModeLoader.load_game_modes("res://data/game_modes.json")
+	if modes.is_empty():
+		return null
+	return modes[0]
