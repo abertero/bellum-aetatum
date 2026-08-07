@@ -49,8 +49,6 @@ func update(delta: float) -> void:
 		return
 	_decision_timer = 0.0
 	_run_decision_cycle()
-
-
 func get_debug_data() -> AIDebugData:
 	return _debug_data
 

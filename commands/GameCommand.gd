@@ -1,15 +1,32 @@
 class_name GameCommand
 extends RefCounted
 
-static var _next_id: int = 0
+var command_id: String = ""
+var tick: int = 0
+var source: String = ""
+var metadata: Dictionary = {}
 
-var command_id: String
-var timestamp: float
-var metadata: Dictionary
+
+func _init() -> void:
+	pass
 
 
-func _init(p_metadata: Dictionary = {}) -> void:
-	_next_id += 1
-	command_id = "cmd_%d" % _next_id
-	timestamp = Time.get_ticks_msec() / 1000.0
-	metadata = p_metadata.duplicate()
+func get_command_type() -> String:
+	return "GameCommand"
+
+
+func serialize() -> Dictionary:
+	return {
+		"command_id": command_id,
+		"tick": tick,
+		"source": source,
+		"command_type": get_command_type(),
+		"metadata": metadata.duplicate(),
+	}
+
+
+func deserialize(data: Dictionary) -> void:
+	command_id = str(data.get("command_id", ""))
+	tick = int(data.get("tick", 0))
+	source = str(data.get("source", ""))
+	metadata = data.get("metadata", {}).duplicate()

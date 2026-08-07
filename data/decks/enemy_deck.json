@@ -1,4 +1,5 @@
 {
+    "schema_version": "1.0.0",
     "_comment": "Enemy deck for stage 001. card_ids references card id values from cards.json.",
     "deck_name": "Enemy Deck Stage 001",
     "card_ids": [

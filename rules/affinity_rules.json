@@ -1,4 +1,5 @@
 {
+  "schema_version": "1.0.0",
   "default_values": {
     "attack_advantage": 1.2,
     "attack_disadvantage": 0.8,

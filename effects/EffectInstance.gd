@@ -13,13 +13,10 @@ var runtime_state: Dictionary = {}
 var metadata: Dictionary = {}
 var _components: Array[EffectComponent] = []
 
-static var _next_id: int = 0
-
 
 static func create(p_definition: EffectDefinition, p_owner: Variant, p_source: Variant) -> EffectInstance:
 	var instance := EffectInstance.new()
-	EffectInstance._next_id += 1
-	instance.instance_id = "effect_%d" % EffectInstance._next_id
+	instance.instance_id = "effect_%s_%d" % [p_definition.id, _generate_id()]
 	instance.definition = p_definition
 	instance.owner = p_owner
 	instance.source = p_source
@@ -27,6 +24,14 @@ static func create(p_definition: EffectDefinition, p_owner: Variant, p_source: V
 	instance.state = State.ACTIVE
 	instance._initialize_components()
 	return instance
+
+
+static var _counter: int = 0
+
+
+static func _generate_id() -> int:
+	EffectInstance._counter += 1
+	return EffectInstance._counter
 
 
 func _initialize_components() -> void:

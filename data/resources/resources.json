@@ -1,4 +1,5 @@
 {
+    "schema_version": "1.0.0",
     "_comment": "Resource definitions. Each resource has: id (unique identifier), display_name (UI text), maximum (cap), starting_value (initial amount), regeneration_rate (per second).",
     "resources": [
         {

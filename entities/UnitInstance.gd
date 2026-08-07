@@ -1,6 +1,7 @@
 class_name UnitInstance
 extends Node2D
 
+var entity_id: String = ""
 var definition: UnitDefinition
 var current_hp: int = 0
 var unit_owner: String = "player"

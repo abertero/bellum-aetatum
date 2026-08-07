@@ -1,7 +1,7 @@
 class_name ProjectileFactory
 extends RefCounted
 
-static var _next_id: int = 0
+static var _counter: int = 0
 static var debug_mode: bool = false
 
 
@@ -11,8 +11,8 @@ static func create_projectile(
 	target: UnitInstance,
 	parent: Node
 ) -> ProjectileInstance:
-	_next_id += 1
-	var projectile_id: String = "projectile_%d" % _next_id
+	_counter += 1
+	var projectile_id: String = "projectile_%s_%d" % [definition.id, _counter]
 	
 	var spawn_position: Vector2 = owner.position
 	var direction: Vector2 = (target.position - owner.position).normalized()

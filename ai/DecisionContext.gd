@@ -6,7 +6,6 @@ var world_state: WorldState = null
 var game_mode: GameModeDefinition = null
 var ai_personality: AIPersonalityDefinition = null
 var cached_perception: WorldState = null
-var random_seed: int = 0
 
 
 static func create(
@@ -20,7 +19,6 @@ static func create(
 	ctx.world_state = p_world_state
 	ctx.game_mode = p_game_mode
 	ctx.ai_personality = p_personality
-	ctx.random_seed = randi()
 	return ctx
 
 

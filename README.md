@@ -33,6 +33,8 @@ res://
     pipelines/           # Ability pipeline (AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor)
     conditions/          # Match conditions (MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition)
     ai/                  # AI Decision Engine (PerceptionSystem, EvaluationSystem, DecisionSystem, AICommandGenerator, AIDecisionEngine, AIRegistry, AILoader, WorldState, AIEvaluationResult, AIDebugData)
+    replay/              # Replay infrastructure (ReplayDefinition, ReplayRecorder, ReplayPlayer, ReplayValidator, StateHasher)
+    schema/              # Schema versioning (SchemaVersion, SchemaValidator, ContentMigrationRegistry, ContentVersion)
     data/
         cards/           # Card database (cards.json)
         decks/           # Deck definitions (player_deck.json, enemy_deck.json)
@@ -75,8 +77,12 @@ Autoloaded singletons and infrastructure available globally.
 | `DeckSystem` | Loads card database and builds decks from JSON. |
 | `EventBus` | Global signal bus for decoupled communication between systems. Emits resource events. |
 | `UnitState` | Enum and string conversion for unit states. |
-| `SimulationContext` | Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides consistent time source for systems. |
+| `SimulationContext` | Manages simulation time with fixed timestep (tick, fixed_delta_time, accumulator, elapsed_time, time_scale, paused, random_seed). Provides DeterministicRandom. |
 | `MatchState` | Enum and string conversion for match states (LOADING, INITIALIZING, COUNTDOWN, RUNNING, PAUSED, VICTORY, DEFEAT, DRAW, FINISHED). |
+| `DeterministicRandom` | LCG-based deterministic random number generator. Supports int, float, bool, range, and selection. |
+| `CommandRecord` | Serializable wrapper for GameCommand with sequence number. |
+| `CommandLog` | Ordered log of all dispatched commands. Supports recording, querying by tick, serialization. |
+| `MatchSnapshot` | Serializable snapshot of full simulation state for replay and checkpoints. |
 
 ### Commands
 
@@ -250,6 +256,29 @@ AI layers for perception, evaluation, decision-making, and command generation. A
 | `AIEvaluationResult` | RefCounted | Evaluation result data: action type, score, action data. |
 | `AIDebugData` | RefCounted | Debug data for AI UI: personality, scores, chosen action, command. |
 
+### Replay
+
+Deterministic replay infrastructure for recording, playback, and validation.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `ReplayDefinition` | RefCounted | Serializable replay data container. Stores format version, content version, seed, initial snapshot, command log, final tick. |
+| `ReplayRecorder` | RefCounted | Records gameplay commands via CommandLog. Supports checkpoints at configurable intervals. |
+| `ReplayPlayer` | RefCounted | Loads replay, provides initial snapshot and seed, advances tick-by-tick with recorded commands. |
+| `ReplayValidator` | RefCounted | Compares expected vs actual snapshots. Identifies first divergence with tick, entity, values, and system. |
+| `StateHasher` | RefCounted | Deterministic FNV-1a-style hash of gameplay state for divergence detection. |
+
+### Schema
+
+Schema versioning infrastructure for content compatibility.
+
+| Class | Type | Responsibility |
+|---|---|---|
+| `SchemaVersion` | RefCounted | Semantic version (major.minor.patch) with compatibility checking. |
+| `SchemaValidator` | RefCounted | Validates JSON files against current schema version. |
+| `ContentMigrationRegistry` | RefCounted | Registry for future schema migrations. |
+| `ContentVersion` | RefCounted | Identifies exact content version used for a replay. |
+
 ## EventBus
 
 All systems communicate through `EventBus` signals, avoiding direct coupling.
@@ -401,14 +430,15 @@ Unit dies
 - [x] **Milestone 13** - Ability Composition Engine: AbilityDefinition, AbilityRegistry, AbilityLoader, AbilityInstance, AbilityComponent, ApplyEffectComponent, SpawnProjectileComponent, GenerateCommandComponent, AbilitySystem, cooldown management, ability UI, debug panel
 - [x] **Milestone 14** - Match Flow Engine: MatchState, MatchFlowSystem, MatchRulesDefinition, NexusState, NexusSystem, MatchCondition, DestroyEnemyNexusCondition, DestroyPlayerNexusCondition, TimeLimitCondition, AbilityPipeline, AbilityPipelineNode, AbilityPipelineExecutor, match UI, countdown, victory/defeat display
 - [x] **Milestone 15** - AI Decision Engine: WorldState, PerceptionSystem, EvaluationSystem, DecisionSystem, AICommandGenerator, AIDecisionEngine, AIRegistry, AILoader, AIPersonalityDefinition, GameModeDefinition, AbilityCommand, AI personalities (Balanced, Aggressive, Defensive, Economic, Rush, Swarm, Legend Hunter), AI debug panel
+- [x] **Milestone 16** - Content Pipeline: ContentPipeline, ContentValidator, ContentIndexer, ContentReport, ContentDiagnostic, ValidationContext, DefinitionValidator, CardValidator, AffinityValidator, AbilityValidator, EffectValidator, ProjectileValidator, GameModeValidator, AIPersonalityValidator, CrossReferenceValidator
+- [x] **Milestone 17** - Deterministic Simulation and Replay: DeterministicRandom, fixed timestep, CommandLog, CommandRecord, MatchSnapshot, ReplayDefinition, ReplayRecorder, ReplayPlayer, ReplayValidator, StateHasher, SchemaVersion, SchemaValidator, ContentMigrationRegistry, ContentVersion, schema versioning for all JSON files, replay debug panel
 
 ### Planned
 
-- [ ] **Milestone 16** - Content Pipeline: tools, editors, content creation workflow
-- [ ] **Milestone 17** - Replay & Deterministic Simulation
-- [ ] **Milestone 18** - Animations and visual effects
-- [ ] **Milestone 19** - Audio: sound effects, music
-- [ ] **Milestone 20** - Menus, settings, save system
+- [ ] **Milestone 18** - Content Creation Tools
+- [ ] **Milestone 19** - Advanced AI
+- [ ] **Milestone 20** - Campaign / Progression
+- [ ] **Milestone 21** - Replay Viewer
 
 ## Architecture Rules
 
@@ -422,6 +452,7 @@ Unit dies
 - Never hardcode game values.
 - Prefer factories instead of switch statements.
 - Keep dependencies pointing inward.
+- Never override Godot native methods (to_string, get_class, etc.). Use descriptive custom names instead.
 
 ## SOLID Principles
 

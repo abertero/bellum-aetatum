@@ -6,6 +6,7 @@ var _indexer: ContentIndexer = null
 var _report: ContentReport = null
 var _indexes: ContentIndexes = null
 var _context: ValidationContext = null
+var _schema_validator: SchemaValidator = null
 
 var _cards: Array[UnitDefinition] = []
 var _affinities: Array[AffinityDefinition] = []
@@ -14,6 +15,7 @@ var _effects: Array[EffectDefinition] = []
 var _projectiles: Array[ProjectileDefinition] = []
 var _game_modes: Array[GameModeDefinition] = []
 var _personalities: Array[AIPersonalityDefinition] = []
+var _raw_data: Dictionary = {}
 
 
 func initialize() -> void:
@@ -21,6 +23,8 @@ func initialize() -> void:
 	_indexer = ContentIndexer.new()
 	_report = ContentReport.create()
 	_context = ValidationContext.new()
+	_schema_validator = SchemaValidator.new()
+	_schema_validator.initialize(SchemaVersion.create(1, 0, 0))
 
 
 func set_cards(cards: Array[UnitDefinition]) -> void:
@@ -51,8 +55,13 @@ func set_personalities(personalities: Array[AIPersonalityDefinition]) -> void:
 	_personalities = personalities
 
 
+func register_raw_data(file_path: String, data: Dictionary) -> void:
+	_raw_data[file_path] = data
+
+
 func run() -> ContentReport:
 	var start_time: int = Time.get_ticks_usec()
+	_validate_schemas()
 	_register_validators()
 	var diagnostics: Array[ContentDiagnostic] = _validator.validate_all(_context)
 	for diag in diagnostics:
@@ -79,6 +88,14 @@ func get_context() -> ValidationContext:
 
 func get_report() -> ContentReport:
 	return _report
+
+
+func _validate_schemas() -> void:
+	for file_path: String in _raw_data:
+		var data: Dictionary = _raw_data[file_path]
+		var schema_diags: Array[ContentDiagnostic] = _schema_validator.validate(data, file_path)
+		for diag in schema_diags:
+			_report.diagnostics.add(diag)
 
 
 func _register_validators() -> void:

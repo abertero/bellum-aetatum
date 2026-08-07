@@ -5,6 +5,8 @@ var _spawn_system: SpawnSystem
 var _attack_system: AttackSystem
 var _economy_system: EconomySystem
 var _ability_system: AbilitySystem = null
+var _command_log: CommandLog = null
+var _simulation_context: SimulationContext = null
 
 
 func initialize(p_spawn_system: SpawnSystem, p_attack_system: AttackSystem, p_economy_system: EconomySystem) -> void:
@@ -17,7 +19,17 @@ func set_ability_system(p_ability_system: AbilitySystem) -> void:
 	_ability_system = p_ability_system
 
 
+func set_command_log(p_log: CommandLog) -> void:
+	_command_log = p_log
+
+
+func set_simulation_context(p_context: SimulationContext) -> void:
+	_simulation_context = p_context
+
+
 func dispatch(command: GameCommand) -> Variant:
+	_assign_command_identity(command)
+	_record_command(command)
 	if command is PlayCardCommand:
 		return _dispatch_play_card(command as PlayCardCommand)
 	if command is AttackCommand:
@@ -26,6 +38,30 @@ func dispatch(command: GameCommand) -> Variant:
 		return _dispatch_ability(command as AbilityCommand)
 	push_error("CommandDispatcher: unhandled command type")
 	return null
+
+
+func _assign_command_identity(command: GameCommand) -> void:
+	if command.command_id == "":
+		if _simulation_context != null:
+			command.command_id = "cmd_%d_%d" % [_simulation_context.tick, _simulation_context.next_entity_id()]
+		else:
+			command.command_id = "cmd_%d" % CommandDispatcher._global_id()
+	if _simulation_context != null:
+		command.tick = _simulation_context.tick
+
+
+static var _global_counter: int = 0
+
+
+static func _global_id() -> int:
+	CommandDispatcher._global_counter += 1
+	return CommandDispatcher._global_counter
+
+
+func _record_command(command: GameCommand) -> void:
+	if _command_log == null:
+		return
+	_command_log.record(command)
 
 
 func _dispatch_play_card(command: PlayCardCommand) -> Variant:

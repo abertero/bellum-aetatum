@@ -105,3 +105,37 @@ Modifiers are merged from affinity rules and active effects, then applied in pri
   - Starting: 5
   - Regeneration: 1.0/second
   - Spent on unit cards (cost varies by card)
+
+## Deterministic Simulation
+
+The simulation is deterministic: the same initial state, random seed, and command sequence always produce the same result.
+
+### Fixed Timestep
+
+The simulation runs at a fixed 30 ticks/second, independent of rendering FPS. Frame time accumulates in SimulationContext; each fixed tick is consumed and systems advance. This ensures identical behavior regardless of frame rate.
+
+### Deterministic Randomness
+
+All gameplay randomness flows through `DeterministicRandom`, seeded from `SimulationContext`. This includes:
+- AI spawn position offsets
+- Player spawn position offsets
+- Any future gameplay random values
+
+### Command Authority
+
+Commands are the authoritative input. Both player and AI commands are recorded in `CommandLog` with tick and sequence number. Replay replays the exact same command sequence through the same systems.
+
+### Replay
+
+A match can be reproduced from:
+1. Initial MatchSnapshot
+2. GameMode
+3. Content Version
+4. Random Seed
+5. Ordered CommandLog
+
+`ReplayPlayer` restores initial state, seeds the random generator, and feeds commands to the existing systems. No separate simulation engine is needed.
+
+### Schema Versioning
+
+All JSON data files include `schema_version`. Replays store the content version used during recording. Incompatible content versions are rejected with a clear diagnostic.

@@ -1,4 +1,5 @@
 {
+    "schema_version": "1.0.0",
     "_comment": "Card database. Each card has: id (unique identifier), name (display name), era (historical period), image (texture path), stats (gameplay values).",
     "cards": [
         {

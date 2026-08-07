@@ -1,4 +1,5 @@
 {
+    "schema_version": "1.0.0",
     "_comment": "Player starter deck. card_ids references card id values from cards.json. Order defines hand layout.",
     "deck_name": "Player Starter Deck",
     "card_ids": [

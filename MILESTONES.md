@@ -2960,3 +2960,122 @@ The timer-based sequential enemy spawn in BattleScene was replaced by the AI dec
 - CommandDispatcher routes AI commands identically to player commands
 - No gameplay system knows whether a command came from player or AI
 
+---
+
+## Milestone 17 - Deterministic Simulation and Replay
+
+### Objective
+
+Introduce the foundation for deterministic simulation and replay. A match must be reproducible from initial state, game mode, content version, random seed, and ordered commands.
+
+### What Was Implemented
+
+#### 1. Deterministic Random Service
+
+`DeterministicRandom` uses a Linear Congruential Generator (LCG) seeded from `SimulationContext`. Supports: seed initialization, random integer, random float, random boolean, deterministic selection. Same seed and call sequence produces identical results.
+
+#### 2. Fixed Timestep Simulation
+
+`SimulationContext` accumulates real time and consumes fixed-size simulation ticks (default 30 Hz). Systems advance only during `consume_tick()`. Rendering continues at native FPS independently.
+
+#### 3. Deterministic IDs
+
+Entity IDs generated from `SimulationContext.next_entity_id()` combining tick number with per-tick counter. `UnitInstance.entity_id` assigned by `SpawnSystem`. `GameCommand` IDs assigned by `CommandDispatcher`.
+
+#### 4. Command Serialization
+
+All `GameCommand` subclasses implement `serialize()` / `deserialize()`. Commands store IDs and immutable data, not runtime object references. `CommandRecord` wraps serialized commands with sequence numbers.
+
+#### 5. CommandLog
+
+Records all dispatched commands in order. Supports: recording, querying by tick, serialization/deserialization, sequence tracking.
+
+#### 6. MatchSnapshot
+
+Captures full simulation state: tick, elapsed time, random seed, match state, world state, economy state, active effects, projectiles, units, cooldowns, command sequence, content version, game mode ID. Fully serializable.
+
+#### 7. Replay Infrastructure
+
+- `ReplayDefinition`: Serializable replay data (format version, engine version, content version, game mode, seed, initial snapshot, command log, final tick, metadata)
+- `ReplayRecorder`: Records gameplay commands via CommandLog, supports checkpoints
+- `ReplayPlayer`: Loads replay, provides initial snapshot, advances tick-by-tick with commands
+- `ReplayValidator`: Compares expected vs actual snapshots, identifies first divergence with tick, entity, values, and system
+- `StateHasher`: Deterministic FNV-1a-style hash of gameplay state
+
+#### 8. Schema Versioning
+
+All JSON data files include `schema_version: "1.0.0"`. `SchemaValidator` checks compatibility during content pipeline runs. `ContentMigrationRegistry` supports future migrations. `ContentVersion` identifies exact content version.
+
+#### 9. Desync Diagnostics
+
+When replay diverges, validator reports: tick, first divergent entity, expected value, actual value, system responsible, command responsible.
+
+#### 10. Replay Debug Screen
+
+Developer-only panel displaying: replay state, current tick, recorded commands, state hash, recording status.
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `core/DeterministicRandom.gd` | Deterministic random number generator |
+| `core/CommandRecord.gd` | Serializable command record |
+| `core/CommandLog.gd` | Ordered command log |
+| `core/MatchSnapshot.gd` | Simulation state snapshot |
+| `schema/SchemaVersion.gd` | Schema version representation |
+| `schema/SchemaValidator.gd` | Schema compatibility validation |
+| `schema/ContentMigrationRegistry.gd` | Migration infrastructure |
+| `schema/ContentVersion.gd` | Content version identifier |
+| `replay/ReplayDefinition.gd` | Replay data container |
+| `replay/ReplayRecorder.gd` | Command recording |
+| `replay/ReplayPlayer.gd` | Replay playback |
+| `replay/ReplayValidator.gd` | State comparison and divergence detection |
+| `replay/StateHasher.gd` | Deterministic state hashing |
+| `docs/adr/ADR-017-Deterministic-Simulation-and-Replay.md` | Architecture Decision Record |
+
+### Files Modified
+
+| File | Changes | Reason |
+|---|---|---|
+| `core/SimulationContext.gd` | Added tick, fixed_delta_time, accumulator, random_seed, DeterministicRandom | Fixed timestep and deterministic random |
+| `commands/GameCommand.gd` | Added serialize/deserialize, removed static counter | Command serialization |
+| `commands/AttackCommand.gd` | Added serialize/deserialize, entity_id references | Serializable attack commands |
+| `commands/PlayCardCommand.gd` | Added serialize/deserialize, card_id references | Serializable spawn commands |
+| `commands/AbilityCommand.gd` | Added serialize/deserialize, entity_id references | Serializable ability commands |
+| `commands/CommandDispatcher.gd` | Added CommandLog integration, deterministic ID assignment | Command recording |
+| `entities/UnitInstance.gd` | Added entity_id field | Deterministic unit identification |
+| `systems/SpawnSystem.gd` | Added SimulationContext for deterministic entity IDs | Deterministic spawning |
+| `effects/EffectInstance.gd` | Updated ID generation | Deterministic effect IDs |
+| `factories/ProjectileFactory.gd` | Updated ID generation | Deterministic projectile IDs |
+| `ai/DecisionContext.gd` | Removed randi() call | Deterministic AI |
+| `ai/AICommandGenerator.gd` | Uses DeterministicRandom for spawn offsets | Deterministic AI |
+| `content/ContentPipeline.gd` | Added schema validation | Schema version checking |
+| `scenes/battle_scene.gd` | Fixed timestep, replay infrastructure, deterministic random | Full integration |
+| `data/cards/cards.json` | Added schema_version | Schema versioning |
+| `data/affinities.json` | Added schema_version | Schema versioning |
+| `data/abilities.json` | Added schema_version | Schema versioning |
+| `data/effects.json` | Added schema_version | Schema versioning |
+| `data/game_modes.json` | Added schema_version | Schema versioning |
+| `data/ai_personalities.json` | Added schema_version | Schema versioning |
+| `data/projectiles/projectiles.json` | Added schema_version | Schema versioning |
+| `data/match_rules.json` | Added schema_version | Schema versioning |
+| `data/resources/resources.json` | Added schema_version | Schema versioning |
+| `data/decks/player_deck.json` | Added schema_version | Schema versioning |
+| `data/decks/enemy_deck.json` | Added schema_version | Schema versioning |
+| `data/stages/stage_001.json` | Added schema_version | Schema versioning |
+| `rules/affinity_rules.json` | Added schema_version | Schema versioning |
+| `README.md` | Updated | New systems documentation |
+| `docs/Architecture.md` | Updated | New layers and signals |
+| `docs/Gameplay.md` | Updated | Deterministic simulation docs |
+
+### Verification
+
+- Same seed produces same random sequence (DeterministicRandom LCG is deterministic)
+- Same initial state and Commands produce same final state (fixed timestep + deterministic random)
+- Player and AI Commands can be replayed (CommandLog records all commands)
+- Replay does not duplicate gameplay logic (ReplayPlayer uses existing Systems)
+- State divergence can be detected (ReplayValidator compares snapshots)
+- Content schema versions are validated (SchemaValidator in ContentPipeline)
+- Incompatible replay content is rejected (ContentVersion compatibility check)
+- Existing gameplay continues working (fixed timestep wraps existing systems)
+

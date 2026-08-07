@@ -54,6 +54,13 @@ var _content_report: ContentReport = null
 var _content_indexes: ContentIndexes = null
 var _decision_context: DecisionContext = null
 var _game_mode_definition: GameModeDefinition = null
+var _command_log: CommandLog = null
+var _replay_recorder: ReplayRecorder = null
+var _replay_player: ReplayPlayer = null
+var _replay_debug_panel: PanelContainer = null
+var _replay_debug_label: Label = null
+var _state_hash: int = 0
+var _random_seed: int = 0
 
 
 func _ready() -> void:
@@ -97,14 +104,17 @@ func _ready() -> void:
 	_setup_match_ui()
 	_setup_match_debug_panel()
 	_setup_ai_debug_panel()
+	_setup_replay_debug_panel()
+	_setup_replay_recorder()
 	_connect_signals()
 	_match_flow_system.start_match()
 
 
 func _physics_process(delta: float) -> void:
 	_simulation_context.update(delta)
-	if _is_match_running():
-		_update_ai(delta)
+	while _simulation_context.consume_tick():
+		if _is_match_running():
+			_update_ai(_simulation_context.fixed_delta_time)
 	_update_debug_panel()
 	_update_resource_panel()
 	_update_card_affordability()
@@ -115,6 +125,7 @@ func _physics_process(delta: float) -> void:
 	_update_match_debug_panel()
 	_update_nexus_display()
 	_update_ai_debug_panel()
+	_update_replay_debug_panel()
 
 
 func _is_match_running() -> bool:
@@ -139,7 +150,9 @@ func _load_stage() -> void:
 
 
 func _setup_simulation_context() -> void:
+	_random_seed = randi()
 	_simulation_context = SimulationContext.new()
+	_simulation_context.initialize(_random_seed, 1.0 / 30.0)
 
 
 func _setup_battlefield() -> void:
@@ -168,6 +181,7 @@ func _setup_battlefield() -> void:
 func _setup_spawn_system() -> void:
 	var unit_scene: PackedScene = load("res://scenes/unit.tscn")
 	_spawn_system = SpawnSystem.new(unit_scene)
+	_spawn_system.set_simulation_context(_simulation_context)
 
 
 func _setup_formation_system() -> void:
@@ -243,6 +257,9 @@ func _setup_economy_system() -> void:
 func _setup_command_dispatcher() -> void:
 	_command_dispatcher = CommandDispatcher.new()
 	_command_dispatcher.initialize(_spawn_system, _attack_system, _economy_system)
+	_command_log = CommandLog.new()
+	_command_dispatcher.set_command_log(_command_log)
+	_command_dispatcher.set_simulation_context(_simulation_context)
 
 
 func _setup_combat_system() -> void:
@@ -347,12 +364,17 @@ func _on_card_pressed(card_def: UnitDefinition) -> void:
 		return
 	var spawn_pos: Vector2 = _stage_definition.player_spawn_position
 	var position := Vector2(spawn_pos.x, spawn_pos.y)
-	position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
+	var rng: DeterministicRandom = _simulation_context.get_random()
+	if rng != null:
+		position += Vector2(rng.next_float_range(-20.0, 20.0), rng.next_float_range(-20.0, 20.0))
+	else:
+		position += Vector2(randf_range(-20.0, 20.0), randf_range(-20.0, 20.0))
 
 	var target_pos: Vector2 = _stage_definition.enemy_spawn_position
 	var target_position := Vector2(target_pos.x, target_pos.y)
 
 	var command: PlayCardCommand = PlayCardCommand.create(card_def, position, target_position, _unit_container, "player")
+	command.source = "player"
 	var result: Variant = _command_dispatcher.dispatch(command)
 	if result != null:
 		print("BattleScene: spawned %s" % card_def.name)
@@ -385,6 +407,7 @@ func _setup_ai_systems() -> void:
 
 	var command_gen := AICommandGenerator.new()
 	command_gen.initialize(_stage_definition, _unit_container)
+	command_gen.set_simulation_context(_simulation_context)
 
 	_ai_engine = AIDecisionEngine.new()
 	_ai_engine.initialize(perception, evaluation, decision_sys, command_gen, _command_dispatcher, personality)
@@ -886,9 +909,28 @@ func _run_content_pipeline() -> void:
 	_content_pipeline.set_projectiles(ProjectileLoader.load_projectiles("res://data/projectiles/projectiles.json"))
 	_content_pipeline.set_game_modes(GameModeLoader.load_game_modes("res://data/game_modes.json"))
 	_content_pipeline.set_personalities(_load_all_personalities())
+	_register_schema_data()
 	_content_report = _content_pipeline.run()
 	_content_indexes = _content_pipeline.get_indexes()
 	print(_content_report.get_summary())
+
+
+func _register_schema_data() -> void:
+	var json_paths: Array[String] = [
+		"res://data/cards/cards.json",
+		"res://data/affinities.json",
+		"res://data/abilities.json",
+		"res://data/effects.json",
+		"res://data/projectiles/projectiles.json",
+		"res://data/game_modes.json",
+		"res://data/ai_personalities.json",
+		"res://data/match_rules.json",
+		"res://rules/affinity_rules.json",
+	]
+	for path: String in json_paths:
+		var data: Variant = JsonLoader.load_json(path)
+		if data is Dictionary:
+			_content_pipeline.register_raw_data(path, data)
 
 
 func _load_all_affinities() -> Array[AffinityDefinition]:
@@ -941,3 +983,84 @@ func _load_default_game_mode() -> GameModeDefinition:
 	if modes.is_empty():
 		return null
 	return modes[0]
+
+
+func _setup_replay_recorder() -> void:
+	var content_version: String = ContentVersion.current().version_string
+	var game_mode_id: String = ""
+	if _game_mode_definition != null:
+		game_mode_id = _game_mode_definition.id
+	_replay_recorder = ReplayRecorder.new()
+	_replay_recorder.initialize(_command_log, _random_seed, content_version, game_mode_id)
+	var initial_snapshot := _capture_snapshot()
+	_replay_recorder.start_recording(initial_snapshot)
+
+
+func _capture_snapshot() -> MatchSnapshot:
+	var snapshot := MatchSnapshot.new()
+	snapshot.simulation_tick = _simulation_context.tick
+	snapshot.elapsed_time = _simulation_context.elapsed_time
+	snapshot.random_seed = _random_seed
+	snapshot.match_state = _match_flow_system.get_current_state() if _match_flow_system != null else 0
+	snapshot.game_mode_id = _game_mode_definition.id if _game_mode_definition != null else ""
+	snapshot.content_version = ContentVersion.current().version_string
+	snapshot.command_sequence = _command_log.get_last_sequence() if _command_log != null else 0
+	snapshot.world_state = _capture_world_state()
+	snapshot.economy_state = _capture_economy_state()
+	return snapshot
+
+
+func _capture_world_state() -> Dictionary:
+	var state: Dictionary = {}
+	var nexus: Dictionary = {}
+	if _nexus_system != null:
+		var player_nexus: NexusState = _nexus_system.get_nexus("player")
+		var enemy_nexus: NexusState = _nexus_system.get_nexus("enemy")
+		if player_nexus != null:
+			nexus["player"] = {"current_hp": player_nexus.current_hp, "max_hp": player_nexus.max_hp}
+		if enemy_nexus != null:
+			nexus["enemy"] = {"current_hp": enemy_nexus.current_hp, "max_hp": enemy_nexus.max_hp}
+	state["nexus"] = nexus
+	state["match_state"] = _match_flow_system.get_current_state() if _match_flow_system != null else 0
+	state["tick"] = _simulation_context.tick
+	return state
+
+
+func _capture_economy_state() -> Dictionary:
+	var state: Dictionary = {}
+	if _economy_system == null:
+		return state
+	for team: String in ["player", "enemy"]:
+		state[team] = {
+			"current": _economy_system.get_current(team, "imperium"),
+			"maximum": _economy_system.get_maximum(team, "imperium"),
+		}
+	return state
+
+
+func _setup_replay_debug_panel() -> void:
+	var canvas_layer: CanvasLayer = get_node_or_null("DebugLayer")
+	if canvas_layer == null:
+		return
+	_replay_debug_panel = PanelContainer.new()
+	_replay_debug_panel.name = "ReplayDebugPanel"
+	_replay_debug_panel.position = Vector2(800.0, 350.0)
+	_replay_debug_panel.custom_minimum_size = Vector2(250.0, 120.0)
+	canvas_layer.add_child(_replay_debug_panel)
+	_replay_debug_label = Label.new()
+	_replay_debug_label.name = "ReplayDebugLabel"
+	_replay_debug_label.add_theme_font_size_override("font_size", 10)
+	_replay_debug_panel.add_child(_replay_debug_label)
+	_replay_debug_label.text = "Replay: Initializing..."
+
+
+func _update_replay_debug_panel() -> void:
+	if _replay_debug_label == null:
+		return
+	var text: String = "Replay Debug\n"
+	text += "Tick: %d\n" % _simulation_context.tick
+	text += "Seed: %d\n" % _random_seed
+	text += "Commands: %d\n" % (_command_log.get_record_count() if _command_log != null else 0)
+	text += "Hash: %x\n" % _state_hash
+	text += "Recording: %s\n" % str(_replay_recorder != null and _replay_recorder.is_recording())
+	_replay_debug_label.text = text

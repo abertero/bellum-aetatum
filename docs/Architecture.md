@@ -30,6 +30,20 @@ Bellum Aetatum uses a layered architecture with clear separation of concerns. Th
          |              |              |
          v              v              v
 +------------------------------------------------------------------+
+|                    Replay Layer                                   |
+|  ReplayDefinition | ReplayRecorder | ReplayPlayer                |
+|  ReplayValidator  | StateHasher                                   |
++------------------------------------------------------------------+
+         |              |              |
+         v              v              v
++------------------------------------------------------------------+
+|                    Schema Layer                                   |
+|  SchemaVersion | SchemaValidator | ContentMigrationRegistry       |
+|  ContentVersion                                                 |
++------------------------------------------------------------------+
+         |              |              |
+         v              v              v
++------------------------------------------------------------------+
 |                      AI Decision Engine                           |
 |  WorldState | PerceptionSystem | EvaluationSystem                |
 |  DecisionSystem | AICommandGenerator | AIDecisionEngine          |
@@ -135,8 +149,12 @@ Autoloaded singletons and infrastructure services available globally.
 - **EventBus**: Global signal bus. All inter-system communication flows through EventBus signals. Systems emit and listen to signals without knowing about each other. Broadcasts `GameAction` objects for gameplay operations. Emits resource events (`resource_changed`, `resource_spent`, `resource_generated`).
 - **JsonLoader**: Reads JSON files from disk and returns parsed data. Has no knowledge of game concepts.
 - **UnitState**: Enum defining unit states (MOVING, WAITING, BLOCKED, ATTACKING, DEAD) and string conversion utility.
-- **SimulationContext**: Manages simulation time (delta_time, elapsed_time, time_scale, paused). Provides a consistent time source for all systems. Updated by BattleScene in `_physics_process()`. Never queries engine clock directly. Future: will support fixed timestep, replay, time scaling, pause, slow motion, deterministic multiplayer.
+- **SimulationContext**: Manages simulation time with fixed timestep (tick, fixed_delta_time, accumulator, elapsed_time, time_scale, paused, random_seed). Provides DeterministicRandom for all gameplay randomness. Uses accumulator pattern: real frame time accumulates, then fixed-size ticks are consumed. Updated by BattleScene in `_physics_process()`. Never queries engine clock directly.
 - **MatchState**: Enum defining match lifecycle states (LOADING, INITIALIZING, COUNTDOWN, RUNNING, PAUSED, VICTORY, DEFEAT, DRAW, FINISHED) and string conversion utility.
+- **DeterministicRandom**: LCG-based deterministic random number generator. Seeded from SimulationContext. Supports: next_int, next_int_range, next_float, next_float_range, next_bool, select_from. Same seed and call sequence always produces identical results.
+- **CommandRecord**: Serializable wrapper for GameCommand. Contains command_id, tick, source, command_type, payload, sequence_number, metadata.
+- **CommandLog**: Ordered log of all dispatched commands. Records commands with sequence numbers. Supports querying by tick, serialization/deserialization.
+- **MatchSnapshot**: Serializable snapshot of full simulation state. Contains: simulation_tick, elapsed_time, random_seed, match_state, world_state, economy_state, active_effects, active_projectiles, active_units, cooldowns, command_sequence, content_version, game_mode_id.
 
 ### Definitions Layer
 
@@ -297,6 +315,25 @@ AI layers for perception, evaluation, decision-making, and command generation. A
 - **AILoader**: Static loader that reads AI personalities from JSON and populates the registry.
 - **AIEvaluationResult**: Data container for evaluation results: action_type (spawn_unit, use_ability, save_resources), score, data dictionary.
 - **AIDebugData**: Debug data for AI UI: personality info, evaluation scores, chosen action, generated command, resource reserve.
+
+### Replay Layer
+
+Deterministic replay infrastructure for recording, playback, and validation.
+
+- **ReplayDefinition**: Serializable replay data container. Stores format_version, engine_version, content_version, game_mode_id, random_seed, initial_snapshot, command_log, final_tick, metadata.
+- **ReplayRecorder**: Records gameplay commands via CommandLog. Supports checkpoints at configurable intervals. Creates ReplayDefinition on stop.
+- **ReplayPlayer**: Loads replay, provides initial snapshot and seed. Advances tick-by-tick returning commands for each tick. Does not duplicate gameplay logic.
+- **ReplayValidator**: Compares expected vs actual MatchSnapshots. Identifies first divergence with tick, entity, expected/actual values, and responsible system.
+- **StateHasher**: Deterministic FNV-1a-style hash of gameplay state. Hashes tick, match state, nexus HP, unit positions/HP/state, economy values. Excludes non-deterministic data.
+
+### Schema Layer
+
+Schema versioning infrastructure for content compatibility.
+
+- **SchemaVersion**: Semantic version (major.minor.patch) with compatibility checking. Major version must match, minor must be >= for compatibility.
+- **SchemaValidator**: Validates JSON files against current schema version. Reports missing or incompatible schema_version fields.
+- **ContentMigrationRegistry**: Registry for future schema migrations. Supports migration paths between versions.
+- **ContentVersion**: Identifies exact content version used for a replay. Replays refuse to run with incompatible content versions.
 
 ### Factories Layer
 

@@ -1,4 +1,5 @@
 {
+  "schema_version": "1.0.0",
   "countdown_duration": 3.0,
   "time_limit": 300.0,
   "nexus_hp": 100,
